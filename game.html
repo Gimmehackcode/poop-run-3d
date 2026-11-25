@@ -32,19 +32,21 @@
              cursor: pointer; padding: 10px; }
   #oTitle { margin: 0 0 10px; font-size: 40px; }
   #oSub { margin: 0; font-size: 18px; }
-  #banner { position: absolute; left: 0; right: 0; top: 38%; text-align: center;
+  #banner { position: absolute; left: 0; right: 0; top: 30%; text-align: center;
             font-size: 30px; display: none; pointer-events: none; }
 
-  #pad { display: grid; grid-template-columns: 70px 70px 70px; grid-template-rows: 56px 56px;
-         gap: 6px; justify-content: center; margin-top: 10px; }
-  #pad button { font-size: 26px; border: none; border-radius: 12px; background: #3a2f55;
-                color: white; cursor: pointer; }
-  #pad button:active { background: #1f1830; }
-  #up { grid-column: 2; grid-row: 1; }
-  #cam { grid-column: 3; grid-row: 1; font-size: 20px !important; background: #666 !important; }
-  #left { grid-column: 1; grid-row: 2; }
-  #down { grid-column: 2; grid-row: 2; }
-  #right { grid-column: 3; grid-row: 2; }
+  #controls { display: flex; align-items: center; justify-content: center; gap: 28px; margin-top: 10px; }
+  #joy { position: relative; width: 130px; height: 130px; border-radius: 50%; touch-action: none;
+         background: radial-gradient(circle, #4b3f6b 0%, #2a2340 70%); border: 3px solid #1a1528;
+         box-shadow: inset 0 0 12px rgba(0,0,0,.5); cursor: grab; }
+  #knob { position: absolute; left: 40px; top: 40px; width: 50px; height: 50px; border-radius: 50%;
+          background: radial-gradient(circle at 35% 35%, #ffffff, #b9b3d6); pointer-events: none;
+          box-shadow: 0 2px 6px rgba(0,0,0,.5); }
+  #side { display: flex; flex-direction: column; gap: 8px; align-items: center; font-size: 12px; color: #555; }
+  #cam { font-size: 24px; width: 64px; height: 52px; border: none; border-radius: 12px;
+         background: #555; color: white; cursor: pointer; }
+  #cam:active { background: #333; }
+  #help { max-width: 150px; text-align: center; line-height: 1.35; }
 </style>
 </head>
 <body>
@@ -56,12 +58,12 @@
     <div id="banner" class="big"></div>
     <div id="overlay"><h2 id="oTitle" class="big">💩 POOP RUN: CITY</h2><p id="oSub" class="big">Loading the city...</p></div>
   </div>
-  <div id="pad">
-    <button id="up">⬆️</button>
-    <button id="cam" title="Switch camera">🎥</button>
-    <button id="left">⬅️</button>
-    <button id="down">⬇️</button>
-    <button id="right">➡️</button>
+  <div id="controls">
+    <div id="joy"><div id="knob"></div></div>
+    <div id="side">
+      <button id="cam" title="Switch camera">🎥</button>
+      <div id="help">Joystick: up = walk, sides = turn<br>Keys: W/↑ walk · S/↓ back · A D/← → turn · Shift = run</div>
+    </div>
   </div>
 </div>
 
@@ -140,9 +142,9 @@ function skyTexture() {
   return t;
 }
 scene.background = skyTexture();
-scene.fog = new THREE.Fog("#e88a6a", 16, 38);
+scene.fog = new THREE.Fog("#e88a6a", 12, 32);
 
-const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 120);
+const camera = new THREE.PerspectiveCamera(60, 1, 0.1, 120);
 let cameraMode = "follow";
 
 function resize() {
@@ -268,13 +270,18 @@ for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) {
 
 const boxGeo = new THREE.BoxGeometry(1, 1, 1).translate(0, 0.5, 0);
 const BUILDINGS = [];
+// SOLID[y][x] = the part of a square you can't walk through (buildings sit back from the road,
+// leaving a sidewalk you CAN walk on), or null if the whole square is walkable
+const SOLID = Array.from({ length: ROWS }, () => Array(COLS).fill(null));
+const SIDEWALK = 0.35;
 for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) {
   const id = buildingId[y][x];
   if (id < 0) continue;
   const same = (nx, ny) => inside(nx, ny) && buildingId[ny][nx] === id;
-  const GAP = 0.12;
+  const GAP = SIDEWALK;
   const x0 = same(x - 1, y) ? 0 : GAP, x1 = same(x + 1, y) ? 1 : 1 - GAP;
   const z0 = same(x, y - 1) ? 0 : GAP, z1 = same(x, y + 1) ? 1 : 1 - GAP;
+  SOLID[y][x] = { x0: x - 0.5 + x0, x1: x - 0.5 + x1, y0: y - 0.5 + z0, y1: y - 0.5 + z1 };
   const info = buildingInfo[id];
   const h = info.floors * FLOOR_H;
   const mesh = new THREE.Mesh(boxGeo, info.mats);
@@ -358,27 +365,44 @@ function nameTag(text) {
   return s;
 }
 
+
+// A little person: body, swinging arms and legs, emoji face, name tag
 function makeCharacter(ch) {
   const g = new THREE.Group();
-  const body = new THREE.Mesh(
-    new THREE.CapsuleGeometry(0.22, 0.3, 6, 16),
-    new THREE.MeshStandardMaterial({ color: ch.color, roughness: 0.5 })
-  );
-  body.position.y = 0.42;
-  body.castShadow = true;
-  g.add(body);
-  const face = emojiSprite(ch.face, 0.55);
-  face.position.y = 0.95;
+  const shirt = new THREE.MeshStandardMaterial({ color: ch.color, roughness: 0.5 });
+  const pants = new THREE.MeshStandardMaterial({ color: "#2b2d42", roughness: 0.7 });
+  const skin = new THREE.MeshStandardMaterial({ color: "#e0ac69", roughness: 0.6 });
+
+  const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.17, 0.22, 6, 12), shirt);
+  torso.position.y = 0.62; torso.castShadow = true;
+  g.add(torso);
+
+  const limb = (mat, len, w, x, y) => {
+    const pivot = new THREE.Group();
+    pivot.position.set(x, y, 0);
+    const m = new THREE.Mesh(new THREE.BoxGeometry(w, len, w).translate(0, -len / 2, 0), mat);
+    m.castShadow = true;
+    pivot.add(m);
+    g.add(pivot);
+    return pivot;
+  };
+  const legL = limb(pants, 0.4, 0.11, -0.08, 0.42);
+  const legR = limb(pants, 0.4, 0.11, 0.08, 0.42);
+  const armL = limb(skin, 0.34, 0.08, -0.23, 0.78);
+  const armR = limb(skin, 0.34, 0.08, 0.23, 0.78);
+
+  const face = emojiSprite(ch.face, 0.5);
+  face.position.y = 1.08;
   g.add(face);
   const tag = nameTag(ch.name);
-  tag.position.y = 1.42;
+  tag.position.y = 1.5;
   g.add(tag);
   // glowing ring under the player so you can always spot yourself
-  const ring = new THREE.Mesh(new THREE.RingGeometry(0.3, 0.4, 24),
-                              new THREE.MeshBasicMaterial({ color: "#7cf9ff", transparent: true, opacity: 0.8 }));
+  const ring = new THREE.Mesh(new THREE.RingGeometry(0.3, 0.38, 24),
+                              new THREE.MeshBasicMaterial({ color: "#7cf9ff", transparent: true, opacity: 0.7 }));
   ring.rotation.x = -Math.PI / 2; ring.position.y = 0.02;
   g.add(ring);
-  g.userData.body = body;
+  g.userData = { torso, legL, legR, armL, armR };
   return g;
 }
 
@@ -460,6 +484,11 @@ function makePoop(golden) {
 // =========================================================
 let S;
 const rand = Math.random;
+const PLAYER_R = 0.24;   // how "wide" the player is when bumping into walls
+const CAR_HIT = 0.5;     // how close a car has to get to run you over (stay on the sidewalk!)
+const COP_HIT = 0.85;    // police jump out and grab you, so they can reach the sidewalk
+const EAT_DIST = 0.45;   // how close you have to get to eat poop
+const TURN_SPEED = 3.2;  // radians per second
 
 function characterIndex(eaten) {
   let idx = 0;
@@ -469,7 +498,7 @@ function characterIndex(eaten) {
 function wantedStars() { return Math.min(CFG.max_stars, 1 + Math.floor(S.eaten / CFG.poop_per_star)); }
 function policeSpeed() { return Math.max(120, CFG.police_speed_ms - (wantedStars() - 1) * CFG.police_speed_step); }
 
-// Every moving thing slides smoothly from (fx, fy) to (x, y)
+// Police and cars slide smoothly from square (fx, fy) to square (x, y)
 function placeAt(e, x, y) { e.x = e.fx = x; e.y = e.fy = y; e.t0 = 0; e.dur = 1; }
 function moveTo(e, x, y, now, dur) {
   e.ang = Math.atan2(x - e.x, y - e.y);
@@ -477,14 +506,45 @@ function moveTo(e, x, y, now, dur) {
 }
 function renderPos(e, now) {
   const k = Math.min(1, (now - e.t0) / e.dur);
-  return [e.fx + (e.x - e.fx) * k, e.fy + (e.y - e.fy) * k, k];
+  return [e.fx + (e.x - e.fx) * k, e.fy + (e.y - e.fy) * k];
 }
 function turnToward(mesh, target) {
   let d = target - mesh.rotation.y;
   d = Math.atan2(Math.sin(d), Math.cos(d));
   mesh.rotation.y += d * 0.25;
 }
-const dist2 = (a, x, y) => Math.abs(a.x - x) + Math.abs(a.y - y);
+// The walkable square you're in, or (on a sidewalk) the nearest street square to you
+function playerTile() {
+  const x = S.player.x, y = S.player.y, rx = Math.round(x), ry = Math.round(y);
+  if (!isWall(rx, ry)) return [rx, ry];
+  let bestT = [rx, ry], bestD = Infinity;
+  for (let ty = ry - 1; ty <= ry + 1; ty++) for (let tx = rx - 1; tx <= rx + 1; tx++) {
+    const d = Math.hypot(tx - x, ty - y);
+    if (!isWall(tx, ty) && d < bestD) { bestD = d; bestT = [tx, ty]; }
+  }
+  return bestT;
+}
+const manhattan = (x1, y1, x2, y2) => Math.abs(x1 - x2) + Math.abs(y1 - y2);
+
+// Does a circle at (x, y) bump into a building, a tree or the edge of the city?
+function bumps(x, y) {
+  const r2 = PLAYER_R * PLAYER_R;
+  for (let ty = Math.round(y - PLAYER_R); ty <= Math.round(y + PLAYER_R); ty++)
+    for (let tx = Math.round(x - PLAYER_R); tx <= Math.round(x + PLAYER_R); tx++) {
+      if (!inside(tx, ty)) return true;
+      const ch = MAP[ty][tx];
+      if (ch === "P" || ch === "T") {                   // tree trunk in the middle of the square
+        const tr = ch === "P" ? 0.12 : 0.3;
+        if ((tx - x) ** 2 + (ty - y) ** 2 < (PLAYER_R + tr) ** 2) return true;
+        continue;
+      }
+      const b = SOLID[ty][tx];
+      if (!b) continue;
+      const cx = Math.max(b.x0, Math.min(x, b.x1)), cy = Math.max(b.y0, Math.min(y, b.y1));
+      if ((cx - x) ** 2 + (cy - y) ** 2 < r2) return true;
+    }
+  return false;
+}
 
 function setPlayerModel() {
   if (S.player.mesh) scene.remove(S.player.mesh);
@@ -492,15 +552,20 @@ function setPlayerModel() {
   scene.add(S.player.mesh);
 }
 
+function resetPlayer() {
+  S.player.x = PLAYER_START[0]; S.player.y = PLAYER_START[1];
+  S.player.ang = Math.PI / 2; // facing east along the street
+}
+
 function newGame() {
   if (S) [...S.police, ...S.poops, ...S.cars].forEach(e => scene.remove(e.mesh));
   S = {
-    player: { dir: null, next: null, ang: 0, mesh: S ? S.player.mesh : null },
+    player: { x: 0, y: 0, ang: 0, speedNow: 0, walkT: 0, mesh: S ? S.player.mesh : null },
     police: [], poops: [], cars: [], eaten: 0, lives: CFG.lives, stars: 1,
     started: false, over: false, msgUntil: 0, safeUntil: 0, popUntil: 0,
-    lastPlayer: 0, lastPolice: 0, lastCars: 0, charIdx: 0,
+    lastPolice: 0, lastCars: 0, lastFrame: 0, charIdx: 0,
   };
-  placeAt(S.player, PLAYER_START[0], PLAYER_START[1]);
+  resetPlayer();
   setPlayerModel();
   addPolice();
   addTraffic();
@@ -520,12 +585,13 @@ function addPolice() {
 
 function addTraffic() {
   let tries = 0;
+  const [tx, ty] = playerTile();
   while (S.cars.length < CFG.traffic_cars && tries++ < 300) {
     const horiz = rand() < 0.5;
     const line = horiz ? H_ROADS[Math.floor(rand() * H_ROADS.length)] : V_ROADS[Math.floor(rand() * V_ROADS.length)];
     const pos = 1 + Math.floor(rand() * ((horiz ? COLS : ROWS) - 2));
     const x = horiz ? pos : line, y = horiz ? line : pos;
-    if (!isRoad(x, y) || dist2(S.player, x, y) < 6 || S.cars.some(c => c.x === x && c.y === y)) continue;
+    if (!isRoad(x, y) || manhattan(tx, ty, x, y) < 6 || S.cars.some(c => c.x === x && c.y === y)) continue;
     const d = rand() < 0.5 ? 1 : -1;
     const car = { dx: horiz ? d : 0, dy: horiz ? 0 : d, mesh: makeCar(CAR_COLORS[S.cars.length % CAR_COLORS.length], false) };
     placeAt(car, x, y);
@@ -538,9 +604,10 @@ function addTraffic() {
 
 function fillPoop() {
   let tries = 0;
+  const [tx, ty] = playerTile();
   while (S.poops.length < CFG.poop_on_map && tries++ < 500) {
     const [x, y] = EMPTY[Math.floor(rand() * EMPTY.length)];
-    if (dist2(S.player, x, y) <= 4 || S.poops.some(p => p.x === x && p.y === y)) continue;
+    if (manhattan(tx, ty, x, y) <= 4 || S.poops.some(p => p.x === x && p.y === y)) continue;
     const golden = rand() < CFG.golden_chance;
     const mesh = makePoop(golden);
     mesh.position.set(wx(x), 0, wz(y));
@@ -557,19 +624,33 @@ function showMsg(text, now, ms = 1600) {
   S.msgUntil = now + ms;
 }
 
-// ---------- Player ----------
-function stepPlayer(now) {
-  const p = S.player;
-  if (p.next) {
-    const [dx, dy] = DIRS[p.next];
-    if (!isWall(p.x + dx, p.y + dy)) p.dir = p.next;
-  }
-  if (!p.dir) return;
-  const [dx, dy] = DIRS[p.dir];
-  if (isWall(p.x + dx, p.y + dy)) return;
-  moveTo(p, p.x + dx, p.y + dy, now, CFG.characters[S.charIdx].speed_ms);
+// ---------- Input: keyboard (hold keys) and on-screen joystick ----------
+const keys = {};
+const joy = { x: 0, y: 0 };   // -1..1, y = -1 is "push up"
+function readInput() {
+  const k = n => (keys[n] ? 1 : 0);
+  let fwd = k("ArrowUp") + k("w") - k("ArrowDown") - k("s");
+  let turn = k("ArrowRight") + k("d") - k("ArrowLeft") - k("a");
+  if (Math.hypot(joy.x, joy.y) > 0.18) { fwd += -joy.y; turn += joy.x; }
+  const run = keys.Shift || Math.hypot(joy.x, joy.y) > 0.9;
+  return { fwd: Math.max(-1, Math.min(1, fwd)), turn: Math.max(-1, Math.min(1, turn)), run };
+}
 
-  const i = S.poops.findIndex(q => q.x === p.x && q.y === p.y);
+// ---------- Player: walk forward/back, turn left/right ----------
+function updatePlayer(now, dt) {
+  const p = S.player, inp = readInput();
+  p.ang -= inp.turn * TURN_SPEED * dt;
+  const base = 1000 / CFG.characters[S.charIdx].speed_ms;    // squares per second
+  const speed = base * (inp.fwd < 0 ? 0.6 : inp.run ? 1.35 : 1) * inp.fwd;
+  const step = speed * dt;
+  const nx = p.x + Math.sin(p.ang) * step, ny = p.y + Math.cos(p.ang) * step;
+  if (!bumps(nx, p.y)) p.x = nx;     // move in x and y separately so you slide along walls
+  if (!bumps(p.x, ny)) p.y = ny;
+  p.speedNow = Math.abs(speed);
+  p.walkT += step * 6;
+
+  // Eat poop?
+  const i = S.poops.findIndex(q => Math.hypot(q.x - p.x, q.y - p.y) < EAT_DIST);
   if (i >= 0) {
     const poop = S.poops[i];
     scene.remove(poop.mesh);
@@ -593,15 +674,15 @@ function stepPlayer(now) {
     fillPoop();
     updateHud();
   }
-  checkHit(now);
 }
 
 // ---------- Police AI (breadth-first search) ----------
 // Works out how many steps every square is from the player.
 function distanceMap() {
   const dist = Array.from({ length: ROWS }, () => Array(COLS).fill(Infinity));
-  const queue = [[S.player.x, S.player.y]];
-  dist[S.player.y][S.player.x] = 0;
+  const [px, py] = playerTile();
+  const queue = [[px, py]];
+  dist[py][px] = 0;
   for (let qi = 0; qi < queue.length; qi++) {
     const [x, y] = queue[qi];
     for (const [dx, dy] of Object.values(DIRS)) {
@@ -630,13 +711,11 @@ function stepPolice(now) {
     }
     moveTo(cop, choice[0], choice[1], now, speed);
   });
-  checkHit(now);
 }
 
 // ---------- Traffic: drive straight, sometimes turn at crossroads ----------
 function stepCars(now) {
   S.cars.forEach(car => {
-    // at a crossroads, maybe turn left or right
     const sides = [[car.dy, car.dx], [-car.dy, -car.dx]].filter(([dx, dy]) => isRoad(car.x + dx, car.y + dy));
     if (sides.length && rand() < 0.3) [car.dx, car.dy] = sides[Math.floor(rand() * sides.length)];
     let nx = car.x + car.dx, ny = car.y + car.dy;
@@ -649,15 +728,14 @@ function stepCars(now) {
     }
     moveTo(car, nx, ny, now, CFG.car_speed_ms);
   });
-  checkHit(now);
 }
 
 function checkHit(now) {
   if (now < S.safeUntil || S.over) return;
-  const at = e => e.x === S.player.x && e.y === S.player.y;
+  const near = d => e => { const [x, y] = renderPos(e, now); return Math.hypot(x - S.player.x, y - S.player.y) < d; };
   let reason = null;
-  if (S.police.some(at)) reason = "CAUGHT BY THE POLICE 🚓";
-  else if (S.cars.some(at)) reason = "RUN OVER! 🚗";
+  if (S.police.some(near(COP_HIT))) reason = "CAUGHT BY THE POLICE 🚓";
+  else if (S.cars.some(near(CAR_HIT))) reason = "RUN OVER! 🚗";
   if (!reason) return;
   S.lives--;
   updateHud();
@@ -668,8 +746,7 @@ function checkHit(now) {
                 "<br><br>Tap or press Space to play again");
     return;
   }
-  placeAt(S.player, PLAYER_START[0], PLAYER_START[1]);
-  S.player.dir = null; S.player.next = null;
+  resetPlayer();
   S.police.forEach(c => placeAt(c, c.sx, c.sy));
   S.safeUntil = now + 2000;
   showMsg(reason, now, 1800);
@@ -713,23 +790,26 @@ radarMap.width = COLS * RT; radarMap.height = ROWS * RT;
   }
 }
 const radar = document.getElementById("radar").getContext("2d");
-function drawRadar(px, py, now) {
-  const W = 240, cx = W / 2, cy = W / 2, s = 2; // canvas is 2x its CSS size
+// The radar turns with you, so "up" on the radar is always the way you're facing
+function drawRadar(now) {
+  const W = 240, p = S.player;
   radar.fillStyle = "#222"; radar.fillRect(0, 0, W, W);
   radar.save();
-  radar.translate(cx, cy);
-  radar.scale(s, s);
-  radar.drawImage(radarMap, -(px + 0.5) * RT, -(py + 0.5) * RT);
-  const dot = (e, color, r) => {
+  radar.translate(W / 2, W / 2);
+  radar.scale(2, 2);
+  radar.rotate(p.ang - Math.PI);
+  radar.drawImage(radarMap, -(p.x + 0.5) * RT, -(p.y + 0.5) * RT);
+  const dot = (x, y, color, r) => {
     radar.fillStyle = color;
-    radar.beginPath(); radar.arc((e.x - px) * RT, (e.y - py) * RT, r, 0, Math.PI * 2); radar.fill();
+    radar.beginPath(); radar.arc((x - p.x) * RT, (y - p.y) * RT, r, 0, Math.PI * 2); radar.fill();
   };
-  S.poops.forEach(p => dot(p, p.golden ? "#ffd23f" : "#a0622d", 3));
-  S.cars.forEach(c => dot(c, "#dddddd", 2.5));
-  S.police.forEach((c, i) => dot(c, Math.floor(now / 250 + i) % 2 ? "#ff2030" : "#3070ff", 4));
-  // player arrow
-  const d = DIRS[S.player.dir || "up"];
-  radar.rotate(Math.atan2(d[0], -d[1]));
+  S.poops.forEach(q => dot(q.x, q.y, q.golden ? "#ffd23f" : "#a0622d", 3));
+  S.cars.forEach(c => { const [x, y] = renderPos(c, now); dot(x, y, "#dddddd", 2.5); });
+  S.police.forEach((c, i) => { const [x, y] = renderPos(c, now); dot(x, y, Math.floor(now / 250 + i) % 2 ? "#ff2030" : "#3070ff", 4); });
+  radar.restore();
+  // you: an arrow in the middle, always pointing up
+  radar.save();
+  radar.translate(W / 2, W / 2); radar.scale(2, 2);
   radar.fillStyle = "white"; radar.strokeStyle = "black"; radar.lineWidth = 1;
   radar.beginPath(); radar.moveTo(0, -6); radar.lineTo(4.5, 5); radar.lineTo(0, 2.5); radar.lineTo(-4.5, 5);
   radar.closePath(); radar.fill(); radar.stroke();
@@ -739,23 +819,36 @@ function drawRadar(px, py, now) {
 // =========================================================
 //  GAME LOOP
 // =========================================================
-const camTarget = new THREE.Vector3();
 const camPos = new THREE.Vector3(0, 22, 13);
-const camGoal = new THREE.Vector3();
+const camLook = new THREE.Vector3();
+const camGoal = new THREE.Vector3(), lookGoal = new THREE.Vector3();
+
+// shortest distance from point (px, py) to the line segment (ax, ay)-(bx, by)
+function segDist(px, py, ax, ay, bx, by) {
+  const vx = bx - ax, vy = by - ay;
+  const t = Math.max(0, Math.min(1, ((px - ax) * vx + (py - ay) * vy) / (vx * vx + vy * vy || 1)));
+  return Math.hypot(px - (ax + t * vx), py - (ay + t * vy));
+}
 
 function loop(now) {
+  const dt = Math.min(0.05, (now - (S.lastFrame || now)) / 1000);
+  S.lastFrame = now;
   if (S.started && !S.over) {
-    if (now - S.lastPlayer >= CFG.characters[S.charIdx].speed_ms) { S.lastPlayer = now; stepPlayer(now); }
+    updatePlayer(now, dt);
     if (now - S.lastPolice >= policeSpeed()) { S.lastPolice = now; stepPolice(now); }
     if (now - S.lastCars >= CFG.car_speed_ms) { S.lastCars = now; stepCars(now); }
+    checkHit(now);
   }
   if (now > S.msgUntil) bannerEl.style.display = "none";
 
-  // Player
-  const [px, py, pk] = renderPos(S.player, now);
-  const pm = S.player.mesh;
-  pm.position.set(wx(px), 0, wz(py));
-  pm.userData.body.position.y = 0.42 + (pk < 1 ? Math.abs(Math.sin(now / 70)) * 0.08 : 0);
+  // Player model: position, facing, walking animation
+  const p = S.player, pm = S.player.mesh, u = pm.userData;
+  pm.position.set(wx(p.x), 0, wz(p.y));
+  pm.rotation.y = p.ang;
+  const swing = p.speedNow > 0.1 ? Math.sin(p.walkT) * 0.7 : 0;
+  u.legL.rotation.x = swing; u.legR.rotation.x = -swing;
+  u.armL.rotation.x = -swing * 0.8; u.armR.rotation.x = swing * 0.8;
+  u.torso.position.y = 0.62 + Math.abs(Math.sin(p.walkT)) * (p.speedNow > 0.1 ? 0.03 : 0);
   pm.visible = !(now < S.safeUntil && Math.floor(now / 120) % 2 === 0);
   pm.scale.setScalar(now < S.popUntil ? 1 + Math.sin(((S.popUntil - now) / 600) * Math.PI) * 0.5 : 1);
 
@@ -772,35 +865,38 @@ function loop(now) {
   });
 
   // Poop spins and bobs
-  S.poops.forEach((p, i) => {
-    p.mesh.rotation.y += p.golden ? 0.05 : 0.02;
-    p.mesh.position.y = Math.sin(now / 300 + i) * 0.05 + 0.03;
+  S.poops.forEach((q, i) => {
+    q.mesh.rotation.y += q.golden ? 0.05 : 0.02;
+    q.mesh.position.y = Math.sin(now / 300 + i) * 0.05 + 0.03;
   });
 
-  // Buildings between the camera and the player shrink so you can see yourself
+  // Camera: behind and above you (third person), or high in the sky
   const follow = cameraMode === "follow";
+  const fx = Math.sin(p.ang), fz = Math.cos(p.ang);
+  if (follow) {
+    camGoal.set(wx(p.x) - fx * 3.3, 2.5, wz(p.y) - fz * 3.3);
+    lookGoal.set(wx(p.x) + fx * 1.6, 0.7, wz(p.y) + fz * 1.6);
+  } else {
+    camGoal.set(0, 22, 13);
+    lookGoal.set(0, 0, 0.5);
+  }
+  camPos.lerp(camGoal, follow ? 0.12 : 0.06);
+  camLook.lerp(lookGoal, 0.2);
+  camera.position.copy(camPos);
+  camera.lookAt(camLook);
+
+  // Buildings between the camera and you shrink so they don't block the view
+  const camTX = camPos.x + COLS / 2 - 0.5, camTY = camPos.z + ROWS / 2 - 0.5;
   for (const b of BUILDINGS) {
-    const hide = follow && b.y > py && b.y <= py + 4 && Math.abs(b.x - px) <= 1.6;
-    const target = hide ? Math.min(1, 0.35 / b.h) : 1;
+    const hide = follow && segDist(b.x, b.y, p.x, p.y, camTX, camTY) < 0.8;
+    const target = hide ? Math.min(1, 0.3 / b.h) : 1;
     if (Math.abs(b.k - target) > 0.001) {
-      b.k += (target - b.k) * 0.15;
+      b.k += (target - b.k) * 0.2;
       b.mesh.scale.y = b.h * b.k;
     }
   }
 
-  // Camera
-  if (follow) {
-    camTarget.set(wx(px), 0, wz(py) - 0.5);
-    camGoal.set(wx(px), 7.5, wz(py) + 5.8);
-  } else {
-    camTarget.set(0, 0, 0.5);
-    camGoal.set(0, 22, 13);
-  }
-  camPos.lerp(camGoal, 0.08);
-  camera.position.copy(camPos);
-  camera.lookAt(camTarget);
-
-  drawRadar(px, py, now);
+  drawRadar(now);
   renderer.render(scene, camera);
   requestAnimationFrame(loop);
 }
@@ -808,46 +904,54 @@ function loop(now) {
 // =========================================================
 //  CONTROLS
 // =========================================================
-function press(dir) {
+function start() {
   if (S.over) newGame();
   if (!S.started) {
     S.started = true;
     S.safeUntil = performance.now() + 1500;
     overlayEl.style.display = "none";
   }
-  if (dir) S.player.next = dir;
 }
 
-const KEYS = { ArrowUp: "up", ArrowDown: "down", ArrowLeft: "left", ArrowRight: "right",
-               w: "up", s: "down", a: "left", d: "right", W: "up", S: "down", A: "left", D: "right" };
+const GAME_KEYS = ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "w", "a", "s", "d", "Shift"];
 document.addEventListener("keydown", e => {
-  if (KEYS[e.key]) { e.preventDefault(); press(KEYS[e.key]); }
-  else if (e.key === " " || e.key === "Enter") { e.preventDefault(); press(null); }
-  else if (e.key === "c" || e.key === "C") toggleCamera();
+  const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+  if (GAME_KEYS.includes(k)) { e.preventDefault(); keys[k] = true; if (k !== "Shift") start(); }
+  else if (e.key === " " || e.key === "Enter") { e.preventDefault(); start(); }
+  else if (k === "c") toggleCamera();
 });
+document.addEventListener("keyup", e => {
+  const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+  keys[k] = false;
+});
+window.addEventListener("blur", () => { for (const k in keys) keys[k] = false; });
 
-["up", "down", "left", "right"].forEach(d => {
-  document.getElementById(d).addEventListener("pointerdown", e => { e.preventDefault(); press(d); });
+// Joystick
+const joyEl = document.getElementById("joy"), knob = document.getElementById("knob");
+let joyId = null;
+function moveJoy(e) {
+  const r = joyEl.getBoundingClientRect();
+  let dx = e.clientX - (r.left + r.width / 2), dy = e.clientY - (r.top + r.height / 2);
+  const max = r.width / 2 - 20, len = Math.hypot(dx, dy);
+  if (len > max) { dx *= max / len; dy *= max / len; }
+  joy.x = dx / max; joy.y = dy / max;
+  knob.style.transform = "translate(" + dx + "px, " + dy + "px)";
+}
+joyEl.addEventListener("pointerdown", e => {
+  e.preventDefault(); joyId = e.pointerId; joyEl.setPointerCapture(e.pointerId); moveJoy(e); start();
 });
+joyEl.addEventListener("pointermove", e => { if (e.pointerId === joyId) moveJoy(e); });
+const endJoy = e => { if (e.pointerId !== joyId) return; joyId = null; joy.x = joy.y = 0; knob.style.transform = ""; };
+joyEl.addEventListener("pointerup", endJoy);
+joyEl.addEventListener("pointercancel", endJoy);
 
 function toggleCamera() { cameraMode = cameraMode === "follow" ? "overview" : "follow"; }
 document.getElementById("cam").addEventListener("pointerdown", e => { e.preventDefault(); toggleCamera(); });
-
-let touchStart = null;
-stage.addEventListener("touchstart", e => { touchStart = e.touches[0]; e.preventDefault(); }, { passive: false });
-stage.addEventListener("touchend", e => {
-  if (!touchStart) return;
-  const t = e.changedTouches[0];
-  const dx = t.clientX - touchStart.clientX, dy = t.clientY - touchStart.clientY;
-  touchStart = null;
-  if (Math.max(Math.abs(dx), Math.abs(dy)) < 20) { press(null); return; }
-  press(Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? "right" : "left") : (dy > 0 ? "down" : "up"));
-}, { passive: false });
-stage.addEventListener("mousedown", () => press(null));
+stage.addEventListener("pointerdown", () => start());
 
 newGame();
 window.gameReady = true;
-showOverlay("💩 POOP RUN: CITY", "Eat poop. Dodge traffic. Escape the police.<br><br>Tap or press any arrow to start");
+showOverlay("💩 POOP RUN: CITY", "Eat poop. Dodge traffic. Escape the police.<br><br>Tap here, then use the joystick or W A S D");
 requestAnimationFrame(loop);
 </script>
 </body>

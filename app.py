@@ -73,9 +73,9 @@ for col, c in zip(cols, CHARACTERS):
 
 with st.expander("How to play"):
     st.markdown(
-        "- **Computer:** click the game, then use the arrow keys or W A S D.\n"
-        "- **Phone:** use the buttons under the game, or swipe on the map.\n"
-        "- Press 🎥 (or C) to switch between the street camera and the sky camera.\n"
+        "- **Phone:** drag the joystick under the game. Up = walk forward, left/right = turn. Push it all the way to run.\n"
+        "- **Computer:** click the game, then W/↑ = walk, S/↓ = back, A D/← → = turn, hold Shift to run.\n"
+        "- The camera follows behind you. Press 🎥 (or C) to switch to the sky camera.\n"
         "- 💩 = 1 point, golden 💩 = 3 points. You have 3 lives.\n"
         "- Police cars catch you, traffic runs you over: both cost a life.\n"
         "- The radar in the corner shows poop (brown/gold), police (flashing) and cars (grey).\n"
@@ -102,6 +102,6 @@ config = {
 with open("game.html", "r", encoding="utf-8") as f:
     game_html = f.read().replace("__CONFIG__", json.dumps(config))
 
-components.html(game_html, height=640, scrolling=False)
+components.html(game_html, height=680, scrolling=False)
 
 st.caption("A silly school practice project. All characters and places are fictional.")

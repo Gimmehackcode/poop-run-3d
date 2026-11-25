@@ -3,7 +3,7 @@
 **Live app:** [paste your Streamlit link here]
 
 ## What it does
-A silly 3D city game at sunset. Run the streets eating poop, upgrade your character, dodge traffic and escape the police.
+A silly 3D city game at sunset, played in **third person**: the camera follows behind your character as you walk freely around the city eating poop, upgrading your character, dodging traffic and escaping the police.
 
 | Character | Unlocks at | Speed |
 |---|---|---|
@@ -14,8 +14,8 @@ A silly 3D city game at sunset. Run the streets eating poop, upgrade your charac
 
 - 💩 = 1 point, golden 💩 = 3 points
 - **Wanted level ⭐:** every 8 points you get another star. Each star adds a police car 🚓, and the police get faster (up to 5 stars)
-- **Traffic 🚗:** normal cars drive around the city and can run you over
-- **Radar:** the round map in the corner shows poop, police and cars
+- **Traffic 🚗:** normal cars drive around the city and can run you over. Stay on the sidewalk to be safe, and be careful crossing the street!
+- **Radar:** the round map in the corner turns with you and shows poop, police and cars
 - You have 3 lives
 
 **Who it's for:** anyone who wants a quick, funny game. All characters and places are fictional.
@@ -24,9 +24,9 @@ A silly 3D city game at sunset. Run the streets eating poop, upgrade your charac
 The police cars use a **path-finding AI** called breadth-first search (BFS). Every step, it works out how many steps each street square is from you, then drives the police toward you along the shortest route. Extra police cars sometimes take a random turn so they spread out and can cut you off.
 
 ## How to play
-- **Computer:** click the game, then use the arrow keys or W A S D.
-- **Phone:** use the buttons under the game, or swipe on the map.
-- Press 🎥 (or C) to switch between the street camera and the sky camera.
+- **Phone:** drag the joystick under the game. Up = walk forward, left/right = turn. Push it all the way to run.
+- **Computer:** click the game, then W/↑ = walk, S/↓ = back, A D/← → = turn, hold Shift to run.
+- Press 🎥 (or C) to switch between the third-person camera and the sky camera.
 
 ## Files
 - `app.py` – the Streamlit page and all the game settings (characters, wanted level, traffic, city map)
@@ -35,7 +35,8 @@ The police cars use a **path-finding AI** called breadth-first search (BFS). Eve
 
 ## What it can't do (limitations)
 - The police chase you but don't plan ambushes on purpose.
-- You walk in 4 directions on a grid. You can't steal cars or go inside buildings.
+- You can't drive cars or go inside buildings.
+- The police and traffic still move square by square on the streets (only you walk freely).
 - On a computer you must click the game before the keys work.
 - Your best score is only saved in your own browser.
 - It needs internet to load the 3D library, and older phones may run slowly.
