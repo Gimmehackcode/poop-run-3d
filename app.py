@@ -1,6 +1,4 @@
-import base64
 import json
-import os
 import streamlit as st
 import streamlit.components.v1 as components
 
@@ -8,97 +6,85 @@ import streamlit.components.v1 as components
 #  GAME SETTINGS  (change these to tweak the game!)
 # =========================================================
 
-# Ranks: you unlock the next one when you've eaten "needs" poops.
-# speed_ms = milliseconds to RUN one map square (smaller = faster). Walking is slower.
-# image = the picture shown in the rank box (put the file next to app.py)
+# Characters unlock when you've eaten "needs" poops.
+# speed_ms = how many milliseconds per step (smaller = faster)
 CHARACTERS = [
-    {"name": "Chan",      "needs": 0,  "color": "#f4a261", "speed_ms": 600, "image": "rank-chan.jpg"},
-    {"name": "Aj",        "needs": 10, "color": "#2a9d8f", "speed_ms": 540, "image": "rank-aj.jpg"},
-    {"name": "TienChai",  "needs": 25, "color": "#e76f51", "speed_ms": 480, "image": "rank-tienchai.jpg"},
-    {"name": "Tom Pearl", "needs": 50, "color": "#ffd23f", "speed_ms": 420, "image": "rank-tompearl.jpg"},
+    {"name": "Chan",      "needs": 0,  "face": "🙂", "color": "#f4a261", "speed_ms": 220},
+    {"name": "Aj",        "needs": 10, "face": "😎", "color": "#2a9d8f", "speed_ms": 190},
+    {"name": "TienChai",  "needs": 25, "face": "🤠", "color": "#e76f51", "speed_ms": 160},
+    {"name": "Tom Pearl", "needs": 50, "face": "👑", "color": "#9b5de5", "speed_ms": 130},
 ]
 
 LIVES = 3
-POOP_ON_MAP = 14           # how many poops are in the city at once
+POOP_ON_MAP = 6            # how many poops are in the city at once
 GOLDEN_CHANCE = 0.12       # chance a new poop is golden (worth 3!)
 
-# Wanted level: one more police officer every few points
+# Wanted level: one more star (and one more police car) every few poops
 POOP_PER_STAR = 8
 MAX_STARS = 5
-POLICE_SPEED_MS = 820      # how fast the police run at 1 star (smaller = faster)
-POLICE_SPEED_STEP = 60     # police get this much faster per extra star
-POLICE_RANDOMNESS = 0.25   # extra officers sometimes take a different street
+POLICE_SPEED_MS = 320      # police speed at 1 star (smaller = faster)
+POLICE_SPEED_STEP = 25     # police get this much faster per extra star
+POLICE_RANDOMNESS = 0.25   # extra police cars sometimes take a random turn
 
-TRAFFIC_CARS = 16          # cars driving around (they can run you over!)
-CAR_SPEED_MS = 520
-PEDESTRIANS = 12           # people walking on the sidewalks (just for fun)
+TRAFFIC_CARS = 5           # normal cars driving around (they can run you over!)
+CAR_SPEED_MS = 260
 
-# The city map (each character is one square):
-#   "#" buildings  "." road  "g" grass  "T" tree  "p" plaza  "k" parking lot
-#   "o" pond  "s" sand  "w" sea  "d" pier
-# Two roads side by side make a big two-lane avenue.
+# The city map:
+#   "#" building   "." road   "g" park grass   "T" park tree   "P" palm tree
 MAP = [
-    "#############################################",
-    "#...........................................#",
-    "#.####.###.##.#.#####..#####.####.#########.#",
-    "#.####.###.##.#.#####..#####.####.#########.#",
-    "#.####.###.##.#.#####..#####.####.#########.#",
-    "#.................................#########.#",
-    "#.ggTg.###.####.#####..#####.####.#########.#",
-    "#.gTgg.###.####.#####..#####.####.#########.#",
-    "#.gggT.###.####.#####..#####.####.#########.#",
-    "#.Tggg.###.####.#####..#####.####.#########.#",
-    "#...........................................#",
-    "#...........................................#",
-    "#.####.###.####.ppppp..#####.####.####.#.##.#",
-    "#.####.###.####.ppppp..#####.####.####.#.##.#",
-    "#.####.###.####.ppppp..#####.####.####.#.##.#",
-    "#.####.###.####.ppppp..#####.####.####.#.##.#",
-    "#...........................................#",
-    "#.####.########.#####..TgggT.####.kkkk.####.#",
-    "#.####.########.#####..ggoog.####.kkkk.####.#",
-    "#......########.#####..gToog.####.kkkk.####.#",
-    "#.####.########.#####..ggoog.####.kkkk.####.#",
-    "#.####.########.#####..TgggT.####.kkkk.####.#",
-    "#...........................................#",
-    "#.####.###.####.#####..#####.####.####.####.#",
-    "#.####.###.####.#####..#####......####.####.#",
-    "#.####.###.####.#####..#####.####.####.####.#",
-    "#.####.###.####.#####..#####.####.####.####.#",
-    "#...........................................#",
-    "sssssssssssssssssssssssssssssssssssssssssssss",
-    "sssssssssssssssssssssssssssssssssssssssssssss",
-    "wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwddwwwwwwwwwwww",
-    "wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwddwwwwwwwwwwww",
-    "wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwddwwwwwwwwwwww",
-    "wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwddwwwwwwwwwwww",
-    "wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwddwwwwwwwwwwww",
-    "wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww",
+    "############################",
+    "#..........................#",
+    "#.P###.P###.####.#.##.P###.#",
+    "#.####.####.####.#.##.####.#",
+    "#.####.####.####.#.##.####.#",
+    "#.###P.###P.####.#.##.###P.#",
+    "#..........................#",
+    "#.P###.####.gggg.P###.####.#",
+    "#.####.####.gTgg.####......#",
+    "#.####.####.ggTg.####.####.#",
+    "#.###P.####.gggg.###P.####.#",
+    "#..........................#",
+    "#.#.##.P###.####.P###.P###.#",
+    "#.#.##......####.####.####.#",
+    "#.#.##.####.####.####.####.#",
+    "#.#.##.###P.####.###P.###P.#",
+    "#..........................#",
+    "############################",
 ]
 
-START = [19, 15]   # where you start (column, row) - in the plaza, away from traffic
-CITY_SEED = 7      # change this number to get different buildings
+CITY_SEED = 7  # change this number to get different building colours and heights
 
 # =========================================================
 #  STREAMLIT PAGE
 # =========================================================
 
-st.set_page_config(page_title="Poop Run: City", page_icon="💩", layout="wide")
-st.markdown("### 💩 Poop Run: City")
+st.set_page_config(page_title="Poop Run: City", page_icon="💩", layout="centered")
+st.title("💩 Poop Run: City")
+st.write(
+    "Sunset in the city. Run the streets, eat as much poop as you can and upgrade your character. "
+    "The more you eat, the higher your **wanted level** ⭐, and the more **police cars** 🚓 chase you. "
+    "Watch out for traffic too!"
+)
 
-def picture(path):
-    """Turn a picture file into text the game can show (or None if the file is missing)."""
-    if not path or not os.path.exists(path):
-        return None
-    kind = "png" if path.lower().endswith(".png") else "jpeg"
-    with open(path, "rb") as f:
-        return "data:image/" + kind + ";base64," + base64.b64encode(f.read()).decode()
+st.subheader("Characters")
+cols = st.columns(len(CHARACTERS))
+for col, c in zip(cols, CHARACTERS):
+    col.markdown(f"### {c['face']}\n**{c['name']}**\n\n{c['needs']} 💩")
 
-
-characters = [{**c, "image": picture(c.get("image"))} for c in CHARACTERS]
+with st.expander("How to play"):
+    st.markdown(
+        "- **Computer:** click the game, then use the arrow keys or W A S D.\n"
+        "- **Phone:** use the buttons under the game, or swipe on the map.\n"
+        "- Press 🎥 (or C) to switch between the street camera and the sky camera.\n"
+        "- 💩 = 1 point, golden 💩 = 3 points. You have 3 lives.\n"
+        "- Police cars catch you, traffic runs you over: both cost a life.\n"
+        "- The radar in the corner shows poop (brown/gold), police (flashing) and cars (grey).\n"
+        "- The police use a path-finding AI (breadth-first search) to find the "
+        "shortest way to you through the streets."
+    )
 
 config = {
-    "characters": characters,
+    "characters": CHARACTERS,
     "lives": LIVES,
     "poop_on_map": POOP_ON_MAP,
     "golden_chance": GOLDEN_CHANCE,
@@ -109,18 +95,13 @@ config = {
     "police_randomness": POLICE_RANDOMNESS,
     "traffic_cars": TRAFFIC_CARS,
     "car_speed_ms": CAR_SPEED_MS,
-    "pedestrians": PEDESTRIANS,
     "map": MAP,
-    "start": START,
     "seed": CITY_SEED,
 }
 
 with open("game.html", "r", encoding="utf-8") as f:
     game_html = f.read().replace("__CONFIG__", json.dumps(config))
 
-components.html(game_html, height=760, scrolling=False)
+components.html(game_html, height=640, scrolling=False)
 
-st.caption(
-    "Press ⛶ (or F) in the game for full screen. Move: W A S D · Run: Shift · Look around: hold right mouse button · "
-    "Menu: Esc. A silly school practice project - all characters and places are fictional."
-)
+st.caption("A silly school practice project. All characters and places are fictional.")
