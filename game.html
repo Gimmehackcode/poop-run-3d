@@ -58,7 +58,7 @@
   #cards { display: flex; gap: 12px; padding: 0 24px; margin-top: auto; margin-bottom: 14px; overflow-x: auto; }
   .card { flex: 0 0 150px; height: 150px; border-radius: 4px; position: relative; cursor: pointer; overflow: hidden;
           border: 3px solid transparent; transition: transform .12s, border-color .12s; box-shadow: 0 4px 14px rgba(0,0,0,.5); }
-  .card .art { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 54px; }
+  .card .art { position: absolute; inset: 0; display: flex; align-items: flex-start; justify-content: center; padding-top: 22px; font-size: 54px; }
   .card .lbl { position: absolute; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,.78); padding: 6px 10px;
                font-family: var(--title); font-size: 24px; letter-spacing: 1px; }
   .card .lbl small { display: block; font-family: var(--ui); font-size: 11px; letter-spacing: 0; opacity: .8; }
@@ -592,8 +592,9 @@ function loadHuman() {
     const next = () => {
       if (i >= MODEL_URLS.length) return done(null);
       loader.load(MODEL_URLS[i++], g => {
-        const box = new THREE.Box3().setFromObject(g.scene);
-        g.height = box.max.y - box.min.y || 1.8;
+        g.scene.updateMatrixWorld(true);
+        const box = new THREE.Box3().setFromObject(g.scene), hgt = box.max.y - box.min.y;
+        g.height = hgt > 1 && hgt < 3 ? hgt : 1.83;
         done(g);
       }, undefined, next);
     };
@@ -1050,7 +1051,7 @@ function drawRadar(now) {
 // =========================================================
 //  CAMERA: free orbit around you (hold right mouse button / drag on phone)
 // =========================================================
-const cam = { yaw: Math.PI, pitch: 0.3, dist: 2.1, curD: 2.1, lastInput: -1e9 };
+const cam = { yaw: Math.PI, pitch: 0.3, dist: 1.7, curD: 1.7, lastInput: -1e9 };
 const TARGET_H = HUMAN_H * 0.78;
 const camPos = new THREE.Vector3(), camLook = new THREE.Vector3();
 function insideBuilding(x, y, h) {
@@ -1090,7 +1091,7 @@ stage.addEventListener("pointerdown", e => {
   if (mode !== "play" && mode !== "dying") return;
   if (e.pointerType === "mouse" && e.button !== 2) return;   // right mouse button turns the camera
   dragId = e.pointerId; lastX = e.clientX; lastY = e.clientY;
-  stage.setPointerCapture(e.pointerId);
+  try { stage.setPointerCapture(e.pointerId); } catch (err) {}
   e.preventDefault();
 });
 stage.addEventListener("pointermove", e => {
@@ -1283,7 +1284,7 @@ function moveJoy(e) {
   joy.x = dx / max; joy.y = dy / max;
   knob.style.transform = "translate(" + dx + "px, " + dy + "px)";
 }
-joyEl.addEventListener("pointerdown", e => { e.preventDefault(); joyId = e.pointerId; joyEl.setPointerCapture(e.pointerId); moveJoy(e); });
+joyEl.addEventListener("pointerdown", e => { e.preventDefault(); joyId = e.pointerId; try { joyEl.setPointerCapture(e.pointerId); } catch (err) {} moveJoy(e); });
 joyEl.addEventListener("pointermove", e => { if (e.pointerId === joyId) moveJoy(e); });
 const endJoy = e => { if (e.pointerId !== joyId) return; joyId = null; joy.x = joy.y = 0; knob.style.transform = ""; };
 joyEl.addEventListener("pointerup", endJoy);
