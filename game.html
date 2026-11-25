@@ -2,105 +2,168 @@
 <html>
 <head>
 <meta charset="utf-8">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@400;600&display=swap" rel="stylesheet">
 <style>
-  body { margin: 0; font-family: system-ui, sans-serif; color: #222; background: transparent;
+  :root { --accent: #2fa84f; --title: "Bebas Neue", Impact, "Arial Narrow Bold", sans-serif;
+          --ui: Oswald, "Arial Narrow", Arial, sans-serif; }
+  body { margin: 0; font-family: var(--ui); color: white; background: transparent;
          user-select: none; -webkit-user-select: none; touch-action: manipulation; }
-  #wrap { max-width: 680px; margin: 0 auto; }
-  #stage { position: relative; width: 100%; border-radius: 12px; overflow: hidden;
-           box-shadow: 0 2px 12px rgba(0,0,0,.35); background: #f28c66; touch-action: none; }
-  #stage canvas.three { display: block; width: 100%; height: 100%; }
+  #wrap { max-width: 960px; margin: 0 auto; }
+  #stage { position: relative; width: 100%; overflow: hidden; border-radius: 10px; background: #120c1c;
+           box-shadow: 0 2px 14px rgba(0,0,0,.4); touch-action: none; }
+  #stage canvas.three { display: block; width: 100%; height: 100%; transition: filter .4s; }
+  .hidden { display: none !important; }
+  .shadowtxt { text-shadow: 0 0 3px #000, 0 2px 4px #000; }
 
-  .big { font-family: Impact, "Arial Black", sans-serif; color: white; letter-spacing: 1px;
-         text-shadow: -2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000, 2px 2px 0 #000; }
-  #hudR { position: absolute; top: 8px; right: 12px; text-align: right; pointer-events: none; }
-  #stars { font-size: 26px; color: #ffd23f; }
-  #stars .off { color: rgba(255,255,255,.35); }
-  #stars.flash { animation: flash .25s 6 alternate; }
-  @keyframes flash { from { transform: scale(1); } to { transform: scale(1.25); color: white; } }
-  #score { font-size: 30px; }
-  #lives { font-size: 20px; }
-  #hudL { position: absolute; top: 8px; left: 12px; pointer-events: none; font-size: 17px; }
-  #hudL small { display: block; font-size: 13px; opacity: .9; }
+  /* ---------- HUD ---------- */
+  #hud { position: absolute; inset: 0; pointer-events: none; }
+  #hudR { position: absolute; top: 10px; right: 14px; text-align: right; }
+  #stars { font-size: 26px; color: #ffd23f; letter-spacing: 1px; }
+  #stars .off { color: rgba(255,255,255,.28); }
+  #stars.flash { animation: flash .22s 8 alternate; }
+  @keyframes flash { to { color: #fff; transform: scale(1.12); } }
+  #score { font-family: var(--title); font-size: 38px; line-height: 1; }
+  #lives { font-size: 18px; }
+  #who { font-family: var(--title); font-size: 20px; margin-top: 4px; }
+  #who small { display: block; font-family: var(--ui); font-size: 13px; opacity: .9; }
+  #tip { position: absolute; top: 12px; left: 12px; max-width: 280px; background: rgba(0,0,0,.72);
+         padding: 10px 12px; font-size: 14px; line-height: 1.4; border-radius: 3px; display: none; }
+  #radar { position: absolute; left: 14px; bottom: 14px; width: 130px; height: 130px; border-radius: 50%;
+           border: 3px solid rgba(0,0,0,.85); box-shadow: 0 0 0 2px rgba(255,255,255,.35); background: #222; }
+  #banner { position: absolute; left: 0; right: 0; top: 34%; text-align: center; font-family: var(--title);
+            font-size: 46px; letter-spacing: 2px; display: none; }
+  #banner small { display: block; font-family: var(--ui); font-size: 18px; letter-spacing: 0; }
 
-  #radar { position: absolute; left: 10px; bottom: 10px; width: 120px; height: 120px;
-           border-radius: 50%; border: 3px solid #111; box-shadow: 0 0 0 2px rgba(255,255,255,.6);
-           background: #222; pointer-events: none; }
+  /* ---------- loading screen ---------- */
+  #loading { position: absolute; inset: 0; background: radial-gradient(circle at 30% 40%, #3b2150, #0b0710 70%);
+             display: flex; align-items: flex-end; justify-content: space-between; padding: 22px; box-sizing: border-box; }
+  #loading .ltitle { font-family: var(--title); font-size: 64px; line-height: .9; align-self: center; }
+  #loading .ltitle span { display: block; font-size: 26px; color: #ffb36b; letter-spacing: 6px; }
+  #loading .lright { display: flex; align-items: center; gap: 10px; font-family: var(--title); font-size: 22px; letter-spacing: 2px; }
+  .spinner { width: 22px; height: 22px; border-radius: 50%; border: 3px solid rgba(255,255,255,.25);
+             border-top-color: white; animation: spin 0.9s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
 
-  #overlay { position: absolute; inset: 0; display: flex; flex-direction: column;
-             align-items: center; justify-content: center; text-align: center;
-             background: linear-gradient(rgba(40,15,60,.75), rgba(200,80,60,.6));
-             cursor: pointer; padding: 10px; }
-  #oTitle { margin: 0 0 10px; font-size: 40px; }
-  #oSub { margin: 0; font-size: 18px; }
-  #banner { position: absolute; left: 0; right: 0; top: 30%; text-align: center;
-            font-size: 30px; display: none; pointer-events: none; }
+  /* ---------- menus ---------- */
+  #menu { position: absolute; inset: 0; display: flex; flex-direction: column;
+          background: linear-gradient(90deg, rgba(5,3,10,.82) 0%, rgba(5,3,10,.35) 55%, rgba(5,3,10,.1) 100%),
+                      linear-gradient(0deg, rgba(0,0,0,.7) 0%, rgba(0,0,0,0) 35%); }
+  #menu.dark { background: rgba(5,3,10,.72); }
+  #mtop { padding: 18px 24px 0; }
+  .logo { font-family: var(--title); font-size: 72px; line-height: .85; letter-spacing: 1px;
+          text-shadow: 3px 3px 0 #000, 0 0 18px rgba(0,0,0,.6); }
+  .logo span { display: inline-block; font-size: 30px; letter-spacing: 8px; background: white; color: #111;
+               padding: 0 10px; margin-top: 6px; text-shadow: none; }
+  #cards { display: flex; gap: 12px; padding: 0 24px; margin-top: auto; margin-bottom: 14px; overflow-x: auto; }
+  .card { flex: 0 0 150px; height: 150px; border-radius: 4px; position: relative; cursor: pointer; overflow: hidden;
+          border: 3px solid transparent; transition: transform .12s, border-color .12s; box-shadow: 0 4px 14px rgba(0,0,0,.5); }
+  .card .art { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 54px; }
+  .card .lbl { position: absolute; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,.78); padding: 6px 10px;
+               font-family: var(--title); font-size: 24px; letter-spacing: 1px; }
+  .card .lbl small { display: block; font-family: var(--ui); font-size: 11px; letter-spacing: 0; opacity: .8; }
+  .card.sel { border-color: white; transform: translateY(-6px); }
+  #panel { position: absolute; left: 24px; top: 108px; width: min(430px, calc(100% - 48px)); }
+  #menu.dark #panel { top: 50%; left: 50%; transform: translate(-50%, -50%); }
+  .phead { font-family: var(--title); font-size: 30px; letter-spacing: 1px; background: var(--accent);
+           padding: 6px 12px 2px; }
+  .row { display: flex; justify-content: space-between; gap: 12px; padding: 7px 12px; background: rgba(0,0,0,.72);
+         font-size: 15px; cursor: pointer; border-top: 1px solid rgba(255,255,255,.06); }
+  .row .v { opacity: .85; text-align: right; }
+  .row.sel { background: white; color: #111; }
+  .row.sel .v { opacity: 1; }
+  .row.info { cursor: default; }
+  .pdesc { background: rgba(0,0,0,.72); padding: 8px 12px; font-size: 13px; line-height: 1.4; opacity: .9;
+           border-top: 2px solid var(--accent); }
+  #ibar { position: absolute; right: 14px; bottom: 12px; display: flex; gap: 14px; font-size: 13px; }
+  #ibar b { display: inline-block; min-width: 18px; padding: 1px 5px; margin-right: 5px; text-align: center;
+            background: white; color: #111; border-radius: 3px; font-weight: 600; }
 
-  #controls { display: flex; align-items: center; justify-content: center; gap: 28px; margin-top: 10px; }
-  #joy { position: relative; width: 130px; height: 130px; border-radius: 50%; touch-action: none;
-         background: radial-gradient(circle, #4b3f6b 0%, #2a2340 70%); border: 3px solid #1a1528;
-         box-shadow: inset 0 0 12px rgba(0,0,0,.5); cursor: grab; }
-  #knob { position: absolute; left: 40px; top: 40px; width: 50px; height: 50px; border-radius: 50%;
-          background: radial-gradient(circle at 35% 35%, #ffffff, #b9b3d6); pointer-events: none;
-          box-shadow: 0 2px 6px rgba(0,0,0,.5); }
-  #side { display: flex; flex-direction: column; gap: 8px; align-items: center; font-size: 12px; color: #555; }
-  #cam { font-size: 24px; width: 64px; height: 52px; border: none; border-radius: 12px;
-         background: #555; color: white; cursor: pointer; }
-  #cam:active { background: #333; }
-  #help { max-width: 150px; text-align: center; line-height: 1.35; }
+  /* ---------- touch controls (phones / tablets only) ---------- */
+  #touch { display: none; align-items: center; justify-content: space-between; padding: 12px 18px; }
+  @media (pointer: coarse) { #touch { display: flex; } }
+  #joy { position: relative; width: 120px; height: 120px; border-radius: 50%; touch-action: none;
+         background: radial-gradient(circle, rgba(255,255,255,.18), rgba(255,255,255,.05) 70%);
+         border: 2px solid rgba(0,0,0,.35); background-color: #2b2438; }
+  #knob { position: absolute; left: 37px; top: 37px; width: 46px; height: 46px; border-radius: 50%;
+          background: radial-gradient(circle at 35% 35%, #fff, #bbb); pointer-events: none; box-shadow: 0 2px 6px rgba(0,0,0,.5); }
+  #touch .hint { color: #555; font-size: 13px; text-align: right; max-width: 170px; }
+  #pauseBtn { font-size: 15px; padding: 8px 14px; border: none; border-radius: 6px; background: #2b2438; color: white; margin-top: 8px; }
 </style>
+<script type="importmap">
+{ "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
 </head>
 <body>
 <div id="wrap">
   <div id="stage">
-    <div id="hudL" class="big"><span id="hChar"></span><small id="hNext"></small><small id="hBest"></small></div>
-    <div id="hudR" class="big"><div id="stars"></div><div id="score">💩 0</div><div id="lives"></div></div>
-    <canvas id="radar" width="240" height="240"></canvas>
-    <div id="banner" class="big"></div>
-    <div id="overlay"><h2 id="oTitle" class="big">💩 POOP RUN: CITY</h2><p id="oSub" class="big">Loading the city...</p></div>
-  </div>
-  <div id="controls">
-    <div id="joy"><div id="knob"></div></div>
-    <div id="side">
-      <button id="cam" title="Switch camera">🎥</button>
-      <div id="help">Joystick: up = walk, sides = turn<br>Keys: W/↑ walk · S/↓ back · A D/← → turn · Shift = run</div>
+    <div id="hud" class="hidden">
+      <div id="tip" class="shadowtxt"></div>
+      <div id="hudR" class="shadowtxt">
+        <div id="stars"></div>
+        <div id="score">💩 0</div>
+        <div id="lives"></div>
+        <div id="who"></div>
+      </div>
+      <canvas id="radar" width="260" height="260"></canvas>
+      <div id="banner" class="shadowtxt"></div>
     </div>
+
+    <div id="menu" class="hidden">
+      <div id="mtop"><div class="logo">POOP RUN<br><span>CITY</span></div></div>
+      <div id="panel" class="hidden"></div>
+      <div id="cards"></div>
+      <div id="ibar" class="shadowtxt"></div>
+    </div>
+
+    <div id="loading">
+      <div class="ltitle shadowtxt">POOP RUN<span>CITY</span></div>
+      <div class="lright"><div id="lmsg">LOADING</div><div class="spinner"></div></div>
+    </div>
+  </div>
+  <div id="touch">
+    <div id="joy"><div id="knob"></div></div>
+    <div class="hint">Drag the joystick to walk (all the way = run).<br>Drag on the game to turn the camera.<br><button id="pauseBtn">❚❚ Menu</button></div>
   </div>
 </div>
 
 <script>
   // If the 3D library can't load (no internet / blocked), say so instead of a blank screen
   setTimeout(() => {
-    if (!window.gameReady) {
-      document.getElementById("oSub").textContent =
-        "Couldn't load the 3D library. Check your internet connection and refresh.";
-    }
-  }, 10000);
+    if (!window.gameReady) document.getElementById("lmsg").textContent =
+      "COULDN'T LOAD THE 3D LIBRARY - CHECK YOUR INTERNET AND REFRESH";
+  }, 15000);
 </script>
 
 <script type="module">
-import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js";
+import * as THREE from "three";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
 
 const CFG = __CONFIG__;
 const MAP = CFG.map;
 const ROWS = MAP.length, COLS = MAP[0].length;
-
-const DIRS = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
-const POLICE_SPAWNS = [[26, 16], [26, 1], [1, 16], [16, 11], [11, 16]];
-const PLAYER_START = [1, 1];
-const H_ROADS = [1, 6, 11, 16];          // rows that are full streets
-const V_ROADS = [1, 6, 11, 16, 21, 26];  // columns that are full streets
+const DIRS = [[0, -1], [0, 1], [-1, 0], [1, 0]];
 
 const inside = (x, y) => x >= 0 && y >= 0 && x < COLS && y < ROWS;
 const tile = (x, y) => (inside(x, y) ? MAP[y][x] : "#");
-const isWall = (x, y) => !(tile(x, y) === "." || tile(x, y) === "g"); // people & police
-const isRoad = (x, y) => tile(x, y) === ".";                         // traffic cars
-const EMPTY = [];
-for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) if (!isWall(x, y)) EMPTY.push([x, y]);
+const isWall = (x, y) => !".gs".includes(tile(x, y));   // squares police can't drive into
+const isRoad = (x, y) => tile(x, y) === ".";             // squares traffic drives on
+const isB = (x, y) => inside(x, y) && MAP[y][x] === "#";
 
-const wx = x => x - COLS / 2 + 0.5;  // tile x -> world x
-const wz = y => y - ROWS / 2 + 0.5;  // tile y -> world z
+// all full-length streets, for spawning traffic
+const H_ROADS = [], V_ROADS = [];
+for (let y = 0; y < ROWS; y++) { let n = 0; for (let x = 0; x < COLS; x++) n += isRoad(x, y); if (n > COLS * 0.8) H_ROADS.push(y); }
+for (let x = 0; x < COLS; x++) { let n = 0; for (let y = 0; y < ROWS; y++) n += isRoad(x, y); if (n > ROWS * 0.6) V_ROADS.push(x); }
+const CROSSROADS = [];
+for (const y of H_ROADS) for (const x of V_ROADS) if (isRoad(x, y)) CROSSROADS.push([x, y]);
 
-// Random numbers that are the same every time (so the city always looks the same)
+const wx = x => x - COLS / 2 + 0.5;  // map square x -> 3D world x
+const wz = y => y - ROWS / 2 + 0.5;  // map square y -> 3D world z
+
 function seeded(seed) {
   return () => {
     seed |= 0; seed = (seed + 0x6d2b79f5) | 0;
@@ -111,349 +174,535 @@ function seeded(seed) {
 }
 const cityRand = seeded(CFG.seed);
 
-function loadBest() { try { return Number(localStorage.getItem("poopRunCityBest")) || 0; } catch (e) { return 0; } }
-function saveBest(v) { try { localStorage.setItem("poopRunCityBest", String(v)); } catch (e) {} }
-let best = loadBest();
+// ---------- saved settings & best score (kept in this browser only) ----------
+const store = {
+  get(k, d) { try { const v = localStorage.getItem("poopRunCity." + k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem("poopRunCity." + k, JSON.stringify(v)); } catch (e) {} },
+};
+const SETTINGS = Object.assign({ graphics: "High", sensitivity: "Medium", invertY: "Off", alwaysRun: "Off" }, store.get("settings", {}));
+let best = store.get("best", 0);
 
 // =========================================================
-//  3D SCENE: sunset sky, lights
+//  RENDERER, SKY, LIGHTS
 // =========================================================
 const stage = document.getElementById("stage");
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.domElement.className = "three";
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.05;
 stage.prepend(renderer.domElement);
+
+function applyGraphics() {
+  const high = SETTINGS.graphics === "High";
+  renderer.setPixelRatio(high ? Math.min(window.devicePixelRatio, 2) : 1);
+  renderer.shadowMap.enabled = high;
+  scene.traverse(o => { if (o.material) [].concat(o.material).forEach(m => (m.needsUpdate = true)); });
+  resize();
+}
 
 const scene = new THREE.Scene();
 function skyTexture() {
   const c = document.createElement("canvas");
-  c.width = 4; c.height = 256;
+  c.width = 4; c.height = 512;
   const g = c.getContext("2d");
-  const grad = g.createLinearGradient(0, 0, 0, 256);
-  grad.addColorStop(0, "#2b1b4e");
-  grad.addColorStop(0.45, "#b8457a");
-  grad.addColorStop(0.75, "#ff8f5a");
-  grad.addColorStop(1, "#ffd08a");
-  g.fillStyle = grad; g.fillRect(0, 0, 4, 256);
+  const grad = g.createLinearGradient(0, 0, 0, 512);
+  grad.addColorStop(0, "#1d1640");
+  grad.addColorStop(0.38, "#6c3a7c");
+  grad.addColorStop(0.62, "#e0626a");
+  grad.addColorStop(0.8, "#ff9a5c");
+  grad.addColorStop(1, "#ffd59a");
+  g.fillStyle = grad; g.fillRect(0, 0, 4, 512);
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;
   return t;
 }
 scene.background = skyTexture();
-scene.fog = new THREE.Fog("#e88a6a", 12, 32);
+scene.fog = new THREE.Fog("#d9806f", 14, 46);
 
-const camera = new THREE.PerspectiveCamera(60, 1, 0.1, 120);
-let cameraMode = "follow";
+const camera = new THREE.PerspectiveCamera(58, 1, 0.03, 200);
 
 function resize() {
   const w = stage.clientWidth;
-  const h = Math.round(w * 0.7);
+  const h = Math.round(w * (w < 600 ? 0.75 : 0.5625));
   stage.style.height = h + "px";
   renderer.setSize(w, h, false);
   camera.aspect = w / h;
   camera.updateProjectionMatrix();
 }
 window.addEventListener("resize", resize);
-resize();
 
-scene.add(new THREE.HemisphereLight("#ffd1a8", "#3a2a4a", 0.9));
-const sun = new THREE.DirectionalLight("#ffb070", 2.2);
-sun.position.set(-12, 9, 7);
+scene.add(new THREE.HemisphereLight("#ffc9a8", "#2e2440", 0.85));
+const sun = new THREE.DirectionalLight("#ffae6e", 2.4);
 sun.castShadow = true;
 sun.shadow.mapSize.set(2048, 2048);
-Object.assign(sun.shadow.camera, { left: -17, right: 17, top: 12, bottom: -12, near: 1, far: 50 });
-scene.add(sun);
+sun.shadow.bias = -0.0005;
+Object.assign(sun.shadow.camera, { left: -14, right: 14, top: 14, bottom: -14, near: 0.5, far: 60 });
+scene.add(sun, sun.target);
+const SUN_OFFSET = new THREE.Vector3(-14, 11, 10);
+function aimSun(x, z) {
+  sun.target.position.set(x, 0, z);
+  sun.position.set(x + SUN_OFFSET.x, SUN_OFFSET.y, z + SUN_OFFSET.z);
+}
+
+// a big low sun on the horizon
+{
+  const c = document.createElement("canvas"); c.width = c.height = 128;
+  const g = c.getContext("2d");
+  const grad = g.createRadialGradient(64, 64, 8, 64, 64, 64);
+  grad.addColorStop(0, "rgba(255,240,200,1)"); grad.addColorStop(0.3, "rgba(255,190,120,.9)"); grad.addColorStop(1, "rgba(255,140,90,0)");
+  g.fillStyle = grad; g.fillRect(0, 0, 128, 128);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, fog: false, depthWrite: false, transparent: true }));
+  s.position.set(-90, 14, 60); s.scale.set(40, 40, 1);
+  scene.add(s);
+}
 
 // =========================================================
-//  THE CITY: ground, buildings, trees
+//  THE CITY
 // =========================================================
 function groundTexture() {
   const P = 32;
   const c = document.createElement("canvas");
   c.width = COLS * P; c.height = ROWS * P;
   const g = c.getContext("2d");
+  const crossroads = (x, y) => isRoad(x, y) && (isRoad(x - 1, y) + isRoad(x + 1, y) + isRoad(x, y - 1) + isRoad(x, y + 1)) >= 3;
   for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) {
     const ch = MAP[y][x], X = x * P, Y = y * P;
     if (ch === ".") {
-      g.fillStyle = "#3b3b42"; g.fillRect(X, Y, P, P);
+      g.fillStyle = "#38383e"; g.fillRect(X, Y, P, P);
+      g.fillStyle = "rgba(255,255,255,.03)";
+      for (let i = 0; i < 10; i++) g.fillRect(X + cityRand() * 31, Y + cityRand() * 31, 1, 1);
       const L = isRoad(x - 1, y), R = isRoad(x + 1, y), U = isRoad(x, y - 1), D = isRoad(x, y + 1);
-      g.fillStyle = "#f2c94c";
-      if ((L || R) && !U && !D) { g.fillRect(X + 3, Y + P / 2 - 1, 10, 2); g.fillRect(X + 19, Y + P / 2 - 1, 10, 2); }
-      if ((U || D) && !L && !R) { g.fillRect(X + P / 2 - 1, Y + 3, 2, 10); g.fillRect(X + P / 2 - 1, Y + 19, 2, 10); }
-      // curbs where the road meets the sidewalk
-      g.fillStyle = "#9a958c";
-      if (isWall(x - 1, y)) g.fillRect(X, Y, 2, P);
-      if (isWall(x + 1, y)) g.fillRect(X + P - 2, Y, 2, P);
-      if (isWall(x, y - 1)) g.fillRect(X, Y, P, 2);
-      if (isWall(x, y + 1)) g.fillRect(X, Y + P - 2, P, 2);
+      const horiz = (L || R) && !U && !D, vert = (U || D) && !L && !R;
+      g.fillStyle = "#e8b93c";
+      if (horiz) { g.fillRect(X + 4, Y + 15, 9, 2); g.fillRect(X + 20, Y + 15, 9, 2); }
+      if (vert) { g.fillRect(X + 15, Y + 4, 2, 9); g.fillRect(X + 15, Y + 20, 2, 9); }
+      // zebra crossings next to crossroads
+      g.fillStyle = "rgba(240,240,240,.85)";
+      if (horiz && crossroads(x - 1, y)) for (let i = 3; i < 30; i += 6) g.fillRect(X + 2, Y + i, 7, 3);
+      if (horiz && crossroads(x + 1, y)) for (let i = 3; i < 30; i += 6) g.fillRect(X + 23, Y + i, 7, 3);
+      if (vert && crossroads(x, y - 1)) for (let i = 3; i < 30; i += 6) g.fillRect(X + i, Y + 2, 3, 7);
+      if (vert && crossroads(x, y + 1)) for (let i = 3; i < 30; i += 6) g.fillRect(X + i, Y + 23, 3, 7);
+      g.fillStyle = "#8d8880";   // curbs
+      if (!isRoad(x - 1, y)) g.fillRect(X, Y, 2, P);
+      if (!isRoad(x + 1, y)) g.fillRect(X + P - 2, Y, 2, P);
+      if (!isRoad(x, y - 1)) g.fillRect(X, Y, P, 2);
+      if (!isRoad(x, y + 1)) g.fillRect(X, Y + P - 2, P, 2);
     } else if (ch === "g" || ch === "T") {
-      g.fillStyle = "#5fae45"; g.fillRect(X, Y, P, P);
-      g.fillStyle = "#4f9a3a";
-      for (let i = 0; i < 6; i++) g.fillRect(X + cityRand() * 30, Y + cityRand() * 30, 2, 2);
+      g.fillStyle = "#5a9e3f"; g.fillRect(X, Y, P, P);
+      g.fillStyle = "#4c8c35";
+      for (let i = 0; i < 14; i++) g.fillRect(X + cityRand() * 30, Y + cityRand() * 30, 2, 2);
+    } else if (ch === "s") {
+      g.fillStyle = "#e6cf98"; g.fillRect(X, Y, P, P);
+      g.fillStyle = "#d6bd84";
+      for (let i = 0; i < 16; i++) g.fillRect(X + cityRand() * 31, Y + cityRand() * 31, 1, 1);
+    } else if (ch === "w") {
+      g.fillStyle = "#1b4f6e"; g.fillRect(X, Y, P, P);
     } else {
-      g.fillStyle = "#b8b0a4"; g.fillRect(X, Y, P, P);
-      g.fillStyle = "#a39b8f";
+      g.fillStyle = "#b3aca1"; g.fillRect(X, Y, P, P);
+      g.fillStyle = "#a29b90";
       g.fillRect(X + 15, Y, 1, P); g.fillRect(X, Y + 15, P, 1);
     }
   }
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;
-  t.anisotropy = 4;
+  t.anisotropy = 8;
   return t;
 }
-const ground = new THREE.Mesh(
-  new THREE.PlaneGeometry(COLS, ROWS),
-  new THREE.MeshStandardMaterial({ map: groundTexture(), roughness: 0.95 })
-);
+const seaY = (() => { for (let y = 0; y < ROWS; y++) if (MAP[y].includes("w")) return y; return ROWS; })();
+// the city ground stops where the sea starts (the sea is its own shiny surface)
+const groundTex = groundTexture();
+groundTex.repeat.set(1, seaY / ROWS); groundTex.offset.set(0, 1 - seaY / ROWS);
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(COLS, seaY),
+                              new THREE.MeshStandardMaterial({ map: groundTex, roughness: 0.95 }));
 ground.rotation.x = -Math.PI / 2;
+ground.position.z = wz(0) - 0.5 + seaY / 2;
 ground.receiveShadow = true;
 scene.add(ground);
 
-const outskirts = new THREE.Mesh(
-  new THREE.PlaneGeometry(120, 120),
-  new THREE.MeshStandardMaterial({ color: "#8a7f72" })
-);
-outskirts.rotation.x = -Math.PI / 2;
-outskirts.position.y = -0.02;
-scene.add(outskirts);
+const landEdge = wz(seaY) - 0.5;   // land around the city, up to the coast
+const land = new THREE.Mesh(new THREE.PlaneGeometry(260, 160), new THREE.MeshStandardMaterial({ color: "#7d7466" }));
+land.rotation.x = -Math.PI / 2; land.position.set(0, -0.03, landEdge - 80);
+scene.add(land);
 
-// Window textures: "map" is the wall with dark windows, "glow" lights some windows up
-function windowTextures(variant) {
+// The sea, with moving ripples
+function waterNormals() {
+  const N = 128, c = document.createElement("canvas"); c.width = c.height = N;
+  const g = c.getContext("2d"), img = g.createImageData(N, N);
+  const r = seeded(99), waves = [];
+  for (let i = 0; i < 6; i++) waves.push([1 + Math.floor(r() * 4), Math.floor(r() * 5) - 2, r() * 6.28, 0.5 + r()]);
+  const h = (x, y) => waves.reduce((s, [kx, ky, p, a]) => s + a * Math.sin(6.283 * (kx * x + ky * y) / N + p), 0);
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+    const dx = h(x - 1, y) - h(x + 1, y), dy = h(x, y - 1) - h(x, y + 1);
+    const l = Math.hypot(dx, dy, 2), i = (y * N + x) * 4;
+    img.data[i] = (dx / l * 0.5 + 0.5) * 255; img.data[i + 1] = (dy / l * 0.5 + 0.5) * 255;
+    img.data[i + 2] = (2 / l * 0.5 + 0.5) * 255; img.data[i + 3] = 255;
+  }
+  g.putImageData(img, 0, 0);
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.repeat.set(30, 20);
+  return t;
+}
+const waterTex = waterNormals();
+const sea = new THREE.Mesh(new THREE.PlaneGeometry(260, 120),
+  new THREE.MeshStandardMaterial({ color: "#1f6a8e", roughness: 0.18, metalness: 0.2, normalMap: waterTex,
+                                   normalScale: new THREE.Vector2(0.6, 0.6) }));
+sea.rotation.x = -Math.PI / 2;
+sea.position.set(0, -0.06, wz(seaY) - 0.5 + 60);
+scene.add(sea);
+
+// Hills far away on the horizon
+{
+  const r = seeded(5), mat = new THREE.MeshStandardMaterial({ color: "#5d5a4c", roughness: 1, flatShading: true });
+  for (let i = 0; i < 22; i++) {
+    const a = Math.PI * (1.05 + r() * 0.9);            // only behind the city (north side)
+    const d = 40 + r() * 25, hgt = 5 + r() * 12;
+    const m = new THREE.Mesh(new THREE.ConeGeometry(8 + r() * 10, hgt, 7), mat);
+    m.position.set(Math.cos(a) * d, hgt / 2 - 0.5, Math.sin(a) * d * 0.8 - 8);
+    scene.add(m);
+  }
+}
+
+// ---------- Buildings ----------
+// Window textures. "glass" = office towers, the others = apartments/shops.
+function windowTextures(seed, glass) {
   const make = () => { const c = document.createElement("canvas"); c.width = c.height = 64; return c; };
   const wall = make(), glow = make();
   const a = wall.getContext("2d"), b = glow.getContext("2d");
+  const r = seeded(seed);
   a.fillStyle = "#ffffff"; a.fillRect(0, 0, 64, 64);
   b.fillStyle = "#000000"; b.fillRect(0, 0, 64, 64);
-  const r = seeded(100 + variant);
-  for (const wx0 of [10, 36]) {
-    a.fillStyle = "#2a3550"; a.fillRect(wx0, 14, 18, 30);
-    if (r() < 0.45) { b.fillStyle = "#ffd27a"; b.fillRect(wx0, 14, 18, 30); }
+  const cols = glass ? [3, 19, 35, 51] : [9, 37];
+  const ww = glass ? 12 : 18;
+  for (const x0 of cols) {
+    a.fillStyle = glass ? "#3d5a78" : "#27324a"; a.fillRect(x0, glass ? 6 : 14, ww, glass ? 50 : 30);
+    a.fillStyle = "rgba(255,255,255,.18)"; a.fillRect(x0, glass ? 6 : 14, ww, 3);
+    if (r() < (glass ? 0.55 : 0.4)) { b.fillStyle = r() < 0.5 ? "#ffd58a" : "#fff1c9"; b.fillRect(x0, glass ? 6 : 14, ww, glass ? 50 : 30); }
   }
+  if (!glass) { a.fillStyle = "rgba(0,0,0,.18)"; a.fillRect(0, 60, 64, 4); }   // ledge between floors
   const tex = c => { const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
                      t.wrapS = t.wrapT = THREE.RepeatWrapping; return t; };
   return { map: tex(wall), glow: tex(glow) };
 }
-const WINDOW_SETS = [0, 1, 2, 3].map(windowTextures);
-const PALETTE = ["#d9a066", "#c76b5a", "#e8d3a9", "#8fa3b8", "#b07aa1", "#6c8f8a", "#e0b85a", "#a8a29e", "#7d8fc9"];
-const roofMat = new THREE.MeshStandardMaterial({ color: "#5d5a63", roughness: 0.9 });
+const WIN = { glass: [1, 2, 3].map(s => windowTextures(s, true)), plain: [4, 5, 6, 7].map(s => windowTextures(s, false)) };
+const WARM = ["#d9a066", "#c76b5a", "#e8d3a9", "#b07aa1", "#e0b85a", "#a8a29e", "#c9b79c", "#9fb6a3", "#d98c6c"];
+const COOL = ["#8fa3b8", "#7d8fc9", "#9aa7b0", "#6f8296", "#b7c4cf"];
+const roofMat = new THREE.MeshStandardMaterial({ color: "#4e4b55", roughness: 0.9 });
+const propMat = new THREE.MeshStandardMaterial({ color: "#8a8790", roughness: 0.8 });
 const FLOOR_H = 0.7;
+const SIDEWALK = 0.32;
 
-// Find each building (connected "#" squares) so it gets one colour and height
-const buildingId = Array.from({ length: ROWS }, () => Array(COLS).fill(-1));
-const buildingInfo = [];
+// 1) cut the "#" areas into rectangles
+const used = Array.from({ length: ROWS }, () => Array(COLS).fill(false));
+const RECTS = [];
 for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) {
-  if (MAP[y][x] !== "#" || buildingId[y][x] >= 0) continue;
-  const id = buildingInfo.length, stack = [[x, y]];
-  buildingId[y][x] = id;
-  let border = false;
-  while (stack.length) {
-    const [cx, cy] = stack.pop();
-    if (cx === 0 || cy === 0 || cx === COLS - 1 || cy === ROWS - 1) border = true;
-    for (const [dx, dy] of Object.values(DIRS)) {
-      const nx = cx + dx, ny = cy + dy;
-      if (tile(nx, ny) === "#" && inside(nx, ny) && buildingId[ny][nx] < 0) { buildingId[ny][nx] = id; stack.push([nx, ny]); }
-    }
-  }
-  const floors = border ? 6 : (cityRand() < 0.15 ? 7 : 1 + Math.floor(cityRand() * 4));
-  const set = WINDOW_SETS[Math.floor(cityRand() * WINDOW_SETS.length)];
-  const map = set.map.clone(), glow = set.glow.clone();
-  map.repeat.set(1, floors); glow.repeat.set(1, floors);
-  map.needsUpdate = glow.needsUpdate = true;
-  const side = new THREE.MeshStandardMaterial({
-    color: PALETTE[Math.floor(cityRand() * PALETTE.length)], map, roughness: 0.8,
-    emissive: "#ffcf7a", emissiveMap: glow, emissiveIntensity: 0.7,
-  });
-  buildingInfo.push({ floors, mats: [side, side, roofMat, roofMat, side, side] });
+  if (!isB(x, y) || used[y][x]) continue;
+  let w = 1;
+  while (isB(x + w, y) && !used[y][x + w]) w++;
+  let h = 1;
+  const rowFree = yy => { for (let i = 0; i < w; i++) if (!isB(x + i, yy) || used[yy][x + i]) return false; return true; };
+  while (rowFree(y + h)) h++;
+  for (let yy = y; yy < y + h; yy++) for (let xx = x; xx < x + w; xx++) used[yy][xx] = true;
+  // leave a sidewalk on every side that faces a street, park or beach
+  const open = (list) => list.some(([xx, yy]) => inside(xx, yy) && !isB(xx, yy));
+  const side = (n, f) => Array.from({ length: n }, (_, i) => f(i));
+  RECTS.push({ x, y, w, h,
+    iL: open(side(h, i => [x - 1, y + i])) ? SIDEWALK : 0, iR: open(side(h, i => [x + w, y + i])) ? SIDEWALK : 0,
+    iT: open(side(w, i => [x + i, y - 1])) ? SIDEWALK : 0, iB: open(side(w, i => [x + i, y + h])) ? SIDEWALK : 0 });
 }
 
+// 2) split each rectangle into a few separate buildings
+const PIECES = [];
+function split(r, p) {
+  const target = 2 + cityRand() * 5;
+  if (p.w * p.h <= target || (p.w === 1 && p.h === 1)) { PIECES.push({ ...p, R: r }); return; }
+  if (p.w >= p.h) { const c = 1 + Math.floor(cityRand() * (p.w - 1)); split(r, { ...p, w: c }); split(r, { ...p, x: p.x + c, w: p.w - c }); }
+  else { const c = 1 + Math.floor(cityRand() * (p.h - 1)); split(r, { ...p, h: c }); split(r, { ...p, y: p.y + c, h: p.h - c }); }
+}
+RECTS.forEach(r => split(r, { x: r.x, y: r.y, w: r.w, h: r.h }));
+
+// 3) make each building: height depends on the district
+const DOWNTOWN = [COLS / 2, ROWS * 0.36];
 const boxGeo = new THREE.BoxGeometry(1, 1, 1).translate(0, 0.5, 0);
-const BUILDINGS = [];
-// SOLID[y][x] = the part of a square you can't walk through (buildings sit back from the road,
-// leaving a sidewalk you CAN walk on), or null if the whole square is walkable
-const SOLID = Array.from({ length: ROWS }, () => Array(COLS).fill(null));
-const SIDEWALK = 0.35;
-for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) {
-  const id = buildingId[y][x];
-  if (id < 0) continue;
-  const same = (nx, ny) => inside(nx, ny) && buildingId[ny][nx] === id;
-  const GAP = SIDEWALK;
-  const x0 = same(x - 1, y) ? 0 : GAP, x1 = same(x + 1, y) ? 1 : 1 - GAP;
-  const z0 = same(x, y - 1) ? 0 : GAP, z1 = same(x, y + 1) ? 1 : 1 - GAP;
-  SOLID[y][x] = { x0: x - 0.5 + x0, x1: x - 0.5 + x1, y0: y - 0.5 + z0, y1: y - 0.5 + z1 };
-  const info = buildingInfo[id];
-  const h = info.floors * FLOOR_H;
-  const mesh = new THREE.Mesh(boxGeo, info.mats);
-  mesh.position.set(wx(x) - 0.5 + (x0 + x1) / 2, 0, wz(y) - 0.5 + (z0 + z1) / 2);
-  mesh.scale.set(x1 - x0, h, z1 - z0);
+const BUCKET = Array.from({ length: ROWS }, () => Array.from({ length: COLS }, () => []));
+for (const p of PIECES) {
+  const R = p.R;
+  const x0 = p.x - 0.5 + (p.x === R.x ? R.iL : 0), x1 = p.x + p.w - 0.5 - (p.x + p.w === R.x + R.w ? R.iR : 0);
+  const y0 = p.y - 0.5 + (p.y === R.y ? R.iT : 0), y1 = p.y + p.h - 0.5 - (p.y + p.h === R.y + R.h ? R.iB : 0);
+  const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
+  const d = Math.hypot((cx - DOWNTOWN[0]) / (COLS / 2), (cy - DOWNTOWN[1]) / (ROWS / 2));
+  const edge = R.x === 0 || R.y === 0 || R.x + R.w === COLS || R.y + R.h === ROWS;
+  let floors, glass = false;
+  if (edge) floors = 3 + Math.floor(cityRand() * 6);
+  else if (d < 0.33) { floors = 9 + Math.floor(cityRand() * 12); glass = cityRand() < 0.75; }
+  else if (d < 0.62) { floors = 3 + Math.floor(cityRand() * 6); glass = cityRand() < 0.2; }
+  else floors = 1 + Math.floor(cityRand() * 3);
+  if (cy > seaY - 9 && !edge) floors = Math.min(floors, 1 + Math.floor(cityRand() * 3));
+  const H = floors * FLOOR_H;
+  const set = glass ? WIN.glass[Math.floor(cityRand() * 3)] : WIN.plain[Math.floor(cityRand() * 4)];
+  const color = glass ? COOL[Math.floor(cityRand() * COOL.length)] : WARM[Math.floor(cityRand() * WARM.length)];
+  const sideMat = (width) => {
+    const map = set.map.clone(), glow = set.glow.clone();
+    map.repeat.set(Math.max(1, Math.round(width * 1.2)), floors); glow.repeat.copy(map.repeat);
+    map.needsUpdate = glow.needsUpdate = true;
+    return new THREE.MeshStandardMaterial({ color, map, roughness: glass ? 0.35 : 0.85, metalness: glass ? 0.35 : 0,
+                                            emissive: "#ffcf86", emissiveMap: glow, emissiveIntensity: 0.85 });
+  };
+  const mx = sideMat(y1 - y0), mz = sideMat(x1 - x0);
+  const mesh = new THREE.Mesh(boxGeo, [mx, mx, roofMat, roofMat, mz, mz]);
+  mesh.position.set(wx(cx), 0, wz(cy));
+  mesh.scale.set(x1 - x0, H, y1 - y0);
   mesh.castShadow = true; mesh.receiveShadow = true;
   scene.add(mesh);
-  BUILDINGS.push({ mesh, x, y, h, k: 1 });
+  // rooftop details: air-con boxes, water tanks, antennas
+  const nProps = Math.floor(cityRand() * 3);
+  for (let i = 0; i < nProps; i++) {
+    const s = 0.12 + cityRand() * 0.18;
+    const prop = new THREE.Mesh(boxGeo, propMat);
+    prop.scale.set(s, s * 0.7, s);
+    prop.position.set(wx(x0 + 0.15 + cityRand() * (x1 - x0 - 0.3)), H, wz(y0 + 0.15 + cityRand() * (y1 - y0 - 0.3)));
+    scene.add(prop);
+  }
+  if (floors >= 14 && cityRand() < 0.5) {
+    const ant = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.02, 1.2, 5), propMat);
+    ant.position.set(wx(cx), H + 0.6, wz(cy));
+    scene.add(ant);
+  }
+  const b = { x0, x1, y0, y1, h: H };
+  for (let yy = p.y; yy < p.y + p.h; yy++) for (let xx = p.x; xx < p.x + p.w; xx++) BUCKET[yy][xx].push(b);
 }
 
-// Palm trees and park trees
-const trunkMat = new THREE.MeshStandardMaterial({ color: "#8b5a2b", roughness: 0.9 });
-const leafMat = new THREE.MeshStandardMaterial({ color: "#2f8f3a", roughness: 0.7, side: THREE.DoubleSide });
+// ---------- Street furniture: palm trees, street lamps, park trees, beach umbrellas ----------
+const OBST = Array.from({ length: ROWS }, () => Array.from({ length: COLS }, () => [])); // round obstacles
+function addObstacle(x, y, r) { const tx = Math.round(x), ty = Math.round(y); if (inside(tx, ty)) OBST[ty][tx].push({ x, y, r }); }
+const nearObstacle = (x, y, d) => {
+  for (let ty = Math.round(y) - 1; ty <= Math.round(y) + 1; ty++) for (let tx = Math.round(x) - 1; tx <= Math.round(x) + 1; tx++)
+    if (inside(tx, ty) && OBST[ty][tx].some(o => Math.hypot(o.x - x, o.y - y) < d)) return true;
+  return false;
+};
+
+const trunkMat = new THREE.MeshStandardMaterial({ color: "#7a5230", roughness: 0.9 });
+const leafMat = new THREE.MeshStandardMaterial({ color: "#2f7d34", roughness: 0.7, side: THREE.DoubleSide });
+const trunkGeo = new THREE.CylinderGeometry(0.025, 0.045, 1.25, 6).translate(0, 0.625, 0);
+const leafGeo = new THREE.BoxGeometry(0.42, 0.01, 0.11).translate(0.2, 0, 0);
 function makePalm() {
   const g = new THREE.Group();
-  const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.08, 1.7, 6), trunkMat);
-  trunk.position.y = 0.85; trunk.castShadow = true;
+  const trunk = new THREE.Mesh(trunkGeo, trunkMat); trunk.castShadow = true; trunk.rotation.z = 0.06;
   g.add(trunk);
-  const leafGeo = new THREE.BoxGeometry(0.65, 0.02, 0.16).translate(0.32, 0, 0);
-  for (let i = 0; i < 7; i++) {
+  for (let i = 0; i < 8; i++) {
     const pivot = new THREE.Group();
-    pivot.position.y = 1.7;
-    pivot.rotation.y = (i / 7) * Math.PI * 2;
+    pivot.position.set(0.07, 1.24, 0);
+    pivot.rotation.y = (i / 8) * Math.PI * 2 + cityRand() * 0.3;
     const leaf = new THREE.Mesh(leafGeo, leafMat);
-    leaf.rotation.z = -0.45;
-    leaf.castShadow = true;
-    pivot.add(leaf);
-    g.add(pivot);
+    leaf.rotation.z = -0.35 - cityRand() * 0.25; leaf.castShadow = true;
+    pivot.add(leaf); g.add(pivot);
   }
   return g;
 }
+const treeTopMat = new THREE.MeshStandardMaterial({ color: "#3e8a37", roughness: 0.85, flatShading: true });
 function makeTree() {
   const g = new THREE.Group();
-  const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.09, 0.6, 6), trunkMat);
-  trunk.position.y = 0.3; trunk.castShadow = true;
-  const top = new THREE.Mesh(new THREE.SphereGeometry(0.42, 12, 10),
-                             new THREE.MeshStandardMaterial({ color: "#3f9a3a", roughness: 0.8 }));
-  top.position.y = 0.85; top.castShadow = true;
+  const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.06, 0.45, 6).translate(0, 0.225, 0), trunkMat);
+  const top = new THREE.Mesh(new THREE.IcosahedronGeometry(0.34, 1), treeTopMat);
+  top.position.y = 0.68; top.scale.y = 1.15;
+  trunk.castShadow = top.castShadow = true;
   g.add(trunk, top);
   return g;
 }
-for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) {
-  const ch = MAP[y][x];
-  if (ch !== "P" && ch !== "T") continue;
-  const t = ch === "P" ? makePalm() : makeTree();
-  t.position.set(wx(x), 0, wz(y));
-  t.rotation.y = cityRand() * Math.PI * 2;
-  scene.add(t);
-}
-
-// =========================================================
-//  CHARACTERS, CARS AND POOP
-// =========================================================
-function emojiSprite(emoji, scale) {
-  const c = document.createElement("canvas");
-  c.width = c.height = 128;
-  const g = c.getContext("2d");
-  g.font = "100px serif"; g.textAlign = "center"; g.textBaseline = "middle";
-  g.fillText(emoji, 64, 72);
-  const tex = new THREE.CanvasTexture(c);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, fog: false }));
-  s.scale.set(scale, scale, 1);
-  return s;
-}
-
-function nameTag(text) {
-  const c = document.createElement("canvas");
-  c.width = 256; c.height = 64;
-  const g = c.getContext("2d");
-  g.fillStyle = "rgba(0,0,0,.65)";
-  g.beginPath(); g.roundRect(8, 8, 240, 48, 20); g.fill();
-  g.fillStyle = "white"; g.font = "bold 30px system-ui";
-  g.textAlign = "center"; g.textBaseline = "middle";
-  g.fillText(text, 128, 33);
-  const tex = new THREE.CanvasTexture(c);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false, fog: false }));
-  s.scale.set(1.2, 0.3, 1);
-  s.renderOrder = 10;
-  return s;
-}
-
-
-// A little person: body, swinging arms and legs, emoji face, name tag
-function makeCharacter(ch) {
+const poleMat = new THREE.MeshStandardMaterial({ color: "#3b3d42", roughness: 0.6, metalness: 0.5 });
+const bulbMat = new THREE.MeshStandardMaterial({ color: "#fff3cf", emissive: "#ffdf9a", emissiveIntensity: 2 });
+function makeLamp(facing) {
   const g = new THREE.Group();
-  const shirt = new THREE.MeshStandardMaterial({ color: ch.color, roughness: 0.5 });
-  const pants = new THREE.MeshStandardMaterial({ color: "#2b2d42", roughness: 0.7 });
-  const skin = new THREE.MeshStandardMaterial({ color: "#e0ac69", roughness: 0.6 });
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.018, 0.9, 6).translate(0, 0.45, 0), poleMat);
+  const arm = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.015, 0.015).translate(0.1, 0, 0), poleMat);
+  arm.position.y = 0.9;
+  const bulb = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.025, 0.045), bulbMat);
+  bulb.position.set(0.19, 0.88, 0);
+  g.add(pole, arm, bulb);
+  g.rotation.y = facing;
+  return g;
+}
+const umbMats = ["#e63946", "#2a9d8f", "#ffd23f", "#457b9d"].map(c => new THREE.MeshStandardMaterial({ color: c, roughness: 0.7, side: THREE.DoubleSide }));
+function makeUmbrella() {
+  const g = new THREE.Group();
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 0.01, 0.5, 5).translate(0, 0.25, 0), poleMat);
+  const top = new THREE.Mesh(new THREE.ConeGeometry(0.28, 0.12, 10, 1, true), umbMats[Math.floor(cityRand() * 4)]);
+  top.position.y = 0.5; top.castShadow = true;
+  const towel = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.005, 0.36), umbMats[Math.floor(cityRand() * 4)]);
+  towel.position.set(0.2, 0.005, 0.05);
+  g.add(pole, top, towel);
+  return g;
+}
+function place(obj, x, y, r) { obj.position.set(wx(x), 0, wz(y)); scene.add(obj); if (r) addObstacle(x, y, r); }
 
-  const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.17, 0.22, 6, 12), shirt);
-  torso.position.y = 0.62; torso.castShadow = true;
-  g.add(torso);
+for (const R of RECTS) {
+  const x0 = R.x - 0.5, x1 = R.x + R.w - 0.5, y0 = R.y - 0.5, y1 = R.y + R.h - 0.5;
+  const south = (y0 + y1) / 2 > ROWS * 0.45;
+  // palm trees on the street corners
+  const corners = [[x0, y0, R.iL, R.iT], [x1, y0, R.iR, R.iT], [x0, y1, R.iL, R.iB], [x1, y1, R.iR, R.iB]];
+  for (const [cx, cy, ia, ib] of corners) {
+    if (!ia || !ib || cityRand() > (south ? 0.85 : 0.45)) continue;
+    const px = cx + (cx === x0 ? ia / 2 : -ia / 2), py = cy + (cy === y0 ? ib / 2 : -ib / 2);
+    const palm = makePalm(); palm.rotation.y = cityRand() * 6.28;
+    place(palm, px, py, 0.05);
+  }
+  // street lamps along the sidewalks, near the curb
+  const sides = [
+    [R.iT, (t) => [x0 + t, y0 + 0.06], Math.PI / 2, R.w], [R.iB, (t) => [x0 + t, y1 - 0.06], -Math.PI / 2, R.w],
+    [R.iL, (t) => [x0 + 0.06, y0 + t], Math.PI, R.h], [R.iR, (t) => [x1 - 0.06, y0 + t], 0, R.h],
+  ];
+  for (const [ins, at, face, len] of sides) {
+    if (!ins) continue;
+    for (let t = 1; t < len; t += 2) {
+      const [lx, ly] = at(t);
+      if (nearObstacle(lx, ly, 0.5)) continue;
+      place(makeLamp(face), lx, ly, 0.03);
+    }
+  }
+}
+for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) {
+  if (MAP[y][x] === "T") place(makeTree(), x, y, 0.2);
+  if (MAP[y][x] === "s" && (y + 1 < ROWS && MAP[y + 1][x] === "w")) {           // beach, next to the water
+    if (cityRand() < 0.35) place(makeUmbrella(), x + (cityRand() - 0.5) * 0.6, y + (cityRand() - 0.5) * 0.4, 0.12);
+  } else if (MAP[y][x] === "s" && x % 2 === 0 && cityRand() < 0.7) {
+    const palm = makePalm(); palm.rotation.y = cityRand() * 6.28;
+    place(palm, x + (cityRand() - 0.5) * 0.5, y + 0.1, 0.05);
+  }
+}
 
-  const limb = (mat, len, w, x, y) => {
-    const pivot = new THREE.Group();
-    pivot.position.set(x, y, 0);
-    const m = new THREE.Mesh(new THREE.BoxGeometry(w, len, w).translate(0, -len / 2, 0), mat);
-    m.castShadow = true;
-    pivot.add(m);
-    g.add(pivot);
-    return pivot;
+// =========================================================
+//  PEOPLE, CARS AND POOP
+// =========================================================
+const HUMAN_H = 0.5;                  // how tall a person is (1 = one map square)
+const MODEL_YAW = Math.PI;            // turn the model so it faces the way it walks
+const WALK_SPEED = 0.65;              // squares per second
+const WALK_REF = 0.42, RUN_REF = 1.1; // speeds the walk/run animations were made for
+const MODEL_URLS = [
+  "https://cdn.jsdelivr.net/gh/mrdoob/three.js@r160/examples/models/gltf/Soldier.glb",
+  "https://threejs.org/examples/models/gltf/Soldier.glb",
+];
+let HUMAN = null;   // the loaded 3D person (with Idle / Walk / Run animations)
+
+function loadHuman() {
+  return new Promise(done => {
+    const loader = new GLTFLoader();
+    let i = 0;
+    const next = () => {
+      if (i >= MODEL_URLS.length) return done(null);
+      loader.load(MODEL_URLS[i++], g => {
+        const box = new THREE.Box3().setFromObject(g.scene);
+        g.height = box.max.y - box.min.y || 1.8;
+        done(g);
+      }, undefined, next);
+    };
+    next();
+    setTimeout(() => done(null), 25000);
+  });
+}
+
+function makeHuman(ch) {
+  const g = new THREE.Group();
+  if (HUMAN) {
+    const model = SkeletonUtils.clone(HUMAN.scene);
+    const tint = new THREE.Color("#ffffff").lerp(new THREE.Color(ch.color), 0.5);
+    model.traverse(o => {
+      if (!o.isMesh) return;
+      o.castShadow = true; o.frustumCulled = false;
+      o.material = o.material.clone();
+      o.material.color.copy(tint);
+    });
+    model.scale.setScalar(HUMAN_H / HUMAN.height);
+    model.rotation.y = MODEL_YAW;
+    g.add(model);
+    const mixer = new THREE.AnimationMixer(model), acts = {};
+    for (const n of ["Idle", "Walk", "Run"]) {
+      const clip = HUMAN.animations.find(a => a.name === n);
+      if (!clip) continue;
+      acts[n] = mixer.clipAction(clip);
+      acts[n].play();
+      acts[n].setEffectiveWeight(n === "Idle" ? 1 : 0);
+    }
+    g.userData = { mixer, acts, w: { Idle: 1, Walk: 0, Run: 0 } };
+    return g;
+  }
+  // Backup person made of simple shapes (used only if the 3D model can't be downloaded)
+  const k = HUMAN_H / 1.6;
+  const mat = c => new THREE.MeshStandardMaterial({ color: c, roughness: 0.6 });
+  const shirt = mat(ch.color), pants = mat("#2b2d42"), skin = mat("#d9a066");
+  const part = (geo, m, x, y) => { const o = new THREE.Mesh(geo, m); o.position.set(x * k, y * k, 0); o.castShadow = true; g.add(o); return o; };
+  part(new THREE.BoxGeometry(0.42 * k, 0.55 * k, 0.24 * k), shirt, 0, 1.12);
+  part(new THREE.SphereGeometry(0.15 * k, 12, 10), skin, 0, 1.55);
+  const limb = (m, len, w, x, y) => {
+    const pivot = new THREE.Group(); pivot.position.set(x * k, y * k, 0);
+    const o = new THREE.Mesh(new THREE.BoxGeometry(w * k, len * k, w * k).translate(0, -len * k / 2, 0), m);
+    o.castShadow = true; pivot.add(o); g.add(pivot); return pivot;
   };
-  const legL = limb(pants, 0.4, 0.11, -0.08, 0.42);
-  const legR = limb(pants, 0.4, 0.11, 0.08, 0.42);
-  const armL = limb(skin, 0.34, 0.08, -0.23, 0.78);
-  const armR = limb(skin, 0.34, 0.08, 0.23, 0.78);
-
-  const face = emojiSprite(ch.face, 0.5);
-  face.position.y = 1.08;
-  g.add(face);
-  const tag = nameTag(ch.name);
-  tag.position.y = 1.5;
-  g.add(tag);
-  // glowing ring under the player so you can always spot yourself
-  const ring = new THREE.Mesh(new THREE.RingGeometry(0.3, 0.38, 24),
-                              new THREE.MeshBasicMaterial({ color: "#7cf9ff", transparent: true, opacity: 0.7 }));
-  ring.rotation.x = -Math.PI / 2; ring.position.y = 0.02;
-  g.add(ring);
-  g.userData = { torso, legL, legR, armL, armR };
+  g.userData = { limbs: [limb(pants, 0.82, 0.15, -0.11, 0.86), limb(pants, 0.82, 0.15, 0.11, 0.86),
+                         limb(skin, 0.6, 0.1, -0.28, 1.38), limb(skin, 0.6, 0.1, 0.28, 1.38)], t: 0 };
   return g;
 }
 
-const wheelGeo = new THREE.CylinderGeometry(0.09, 0.09, 0.07, 10).rotateZ(Math.PI / 2);
-const wheelMat = new THREE.MeshStandardMaterial({ color: "#111" });
-const glassMat = new THREE.MeshStandardMaterial({ color: "#1f2a3a", roughness: 0.2, metalness: 0.5 });
-const lampMat = new THREE.MeshStandardMaterial({ color: "#fff6c0", emissive: "#fff2a0", emissiveIntensity: 1 });
+// Blend smoothly between standing, walking and running
+function animateHuman(g, speed, runSpeed, dt) {
+  const u = g.userData;
+  if (u.mixer) {
+    const state = speed < 0.05 ? "Idle" : speed > (WALK_SPEED + runSpeed) / 2 ? "Run" : "Walk";
+    for (const n in u.acts) {
+      u.w[n] += ((n === state ? 1 : 0) - u.w[n]) * Math.min(1, dt * 9);
+      u.acts[n].setEffectiveWeight(u.w[n]);
+    }
+    if (u.acts.Walk) u.acts.Walk.timeScale = Math.min(2.4, Math.max(0.7, speed / WALK_REF));
+    if (u.acts.Run) u.acts.Run.timeScale = Math.min(2.6, Math.max(0.8, speed / RUN_REF));
+    u.mixer.update(dt);
+  } else {
+    u.t += speed * dt * 14;
+    const s = speed > 0.05 ? Math.sin(u.t) * 0.7 : 0;
+    u.limbs[0].rotation.x = s; u.limbs[1].rotation.x = -s; u.limbs[2].rotation.x = -s * 0.8; u.limbs[3].rotation.x = s * 0.8;
+  }
+}
+
+const wheelGeo = new THREE.CylinderGeometry(0.09, 0.09, 0.07, 12).rotateZ(Math.PI / 2);
+const wheelMat = new THREE.MeshStandardMaterial({ color: "#111", roughness: 0.8 });
+const glassMat = new THREE.MeshStandardMaterial({ color: "#1c2533", roughness: 0.1, metalness: 0.6 });
+const lampMat = new THREE.MeshStandardMaterial({ color: "#fff6c0", emissive: "#fff2a0", emissiveIntensity: 2 });
+const tailMat = new THREE.MeshStandardMaterial({ color: "#8a0010", emissive: "#ff2030", emissiveIntensity: 1.2 });
 function makeCar(color, police) {
   const g = new THREE.Group();
-  const bodyMat = new THREE.MeshStandardMaterial({ color: police ? "#f5f5f5" : color, roughness: 0.35, metalness: 0.3 });
-  const body = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.2, 0.86), bodyMat);
-  body.position.y = 0.19; body.castShadow = true;
-  g.add(body);
+  const bodyMat = new THREE.MeshStandardMaterial({ color: police ? "#f2f2f2" : color, roughness: 0.3, metalness: 0.45 });
+  const body = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.17, 0.92), bodyMat);
+  body.position.y = 0.17; body.castShadow = true; g.add(body);
+  const hood = new THREE.Mesh(new THREE.BoxGeometry(0.44, 0.05, 0.3), bodyMat);
+  hood.position.set(0, 0.27, 0.28); g.add(hood);
   if (police) {
-    const stripe = new THREE.Mesh(new THREE.BoxGeometry(0.51, 0.08, 0.5),
-                                  new THREE.MeshStandardMaterial({ color: "#111" }));
-    stripe.position.y = 0.19;
-    g.add(stripe);
+    const black = new THREE.MeshStandardMaterial({ color: "#111", roughness: 0.4, metalness: 0.4 });
+    const doors = new THREE.Mesh(new THREE.BoxGeometry(0.47, 0.1, 0.42), black);
+    doors.position.y = 0.16; g.add(doors);
   }
-  const cabin = new THREE.Mesh(new THREE.BoxGeometry(0.44, 0.17, 0.44), glassMat);
-  cabin.position.set(0, 0.37, -0.05); cabin.castShadow = true;
-  g.add(cabin);
-  for (const [x, z] of [[-0.26, 0.28], [0.26, 0.28], [-0.26, -0.28], [0.26, -0.28]]) {
-    const w = new THREE.Mesh(wheelGeo, wheelMat);
-    w.position.set(x, 0.09, z);
-    g.add(w);
+  const cabin = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.15, 0.46), glassMat);
+  cabin.position.set(0, 0.33, -0.08); cabin.castShadow = true; g.add(cabin);
+  for (const [x, z] of [[-0.23, 0.3], [0.23, 0.3], [-0.23, -0.3], [0.23, -0.3]]) {
+    const w = new THREE.Mesh(wheelGeo, wheelMat); w.position.set(x, 0.09, z); g.add(w);
   }
-  for (const x of [-0.16, 0.16]) {
-    const lamp = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.05, 0.02), lampMat);
-    lamp.position.set(x, 0.21, 0.435);
-    g.add(lamp);
+  for (const x of [-0.15, 0.15]) {
+    const lamp = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.04, 0.02), lampMat); lamp.position.set(x, 0.2, 0.465); g.add(lamp);
+    const tail = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.04, 0.02), tailMat); tail.position.set(x, 0.2, -0.465); g.add(tail);
   }
   if (police) {
-    const red = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.07, 0.1), new THREE.MeshBasicMaterial({ color: "#ff2030" }));
-    const blue = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.07, 0.1), new THREE.MeshBasicMaterial({ color: "#2050ff" }));
-    red.position.set(-0.09, 0.49, -0.05); blue.position.set(0.09, 0.49, -0.05);
+    const red = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.05, 0.08), new THREE.MeshBasicMaterial({ color: "#ff2030" }));
+    const blue = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.05, 0.08), new THREE.MeshBasicMaterial({ color: "#2050ff" }));
+    red.position.set(-0.08, 0.43, -0.08); blue.position.set(0.08, 0.43, -0.08);
     g.add(red, blue);
     g.userData.lights = [red, blue];
   }
   return g;
 }
-const CAR_COLORS = ["#e63946", "#2a9d8f", "#f4a261", "#457b9d", "#ffd23f", "#8338ec", "#06d6a0", "#ef476f"];
+const CAR_COLORS = ["#b3202c", "#1f6f66", "#d4813f", "#2f5677", "#d8b02c", "#5b2a91", "#e8e8e8", "#222428", "#7a8088", "#9b1b48"];
 
-const poopMat = new THREE.MeshStandardMaterial({ color: "#6b3e1f", roughness: 0.6 });
-const goldMat = new THREE.MeshStandardMaterial({ color: "#ffd23f", roughness: 0.25, metalness: 0.8,
-                                                 emissive: "#a07000", emissiveIntensity: 0.5 });
-const poopGeos = [
-  new THREE.TorusGeometry(0.18, 0.09, 10, 20),
-  new THREE.TorusGeometry(0.125, 0.077, 10, 20),
-  new THREE.TorusGeometry(0.07, 0.063, 10, 20),
-];
+const poopMat = new THREE.MeshStandardMaterial({ color: "#5e351a", roughness: 0.55 });
+const goldMat = new THREE.MeshStandardMaterial({ color: "#ffd23f", roughness: 0.2, metalness: 0.9, emissive: "#a07000", emissiveIntensity: 0.5 });
+const poopGeos = [new THREE.TorusGeometry(0.18, 0.09, 10, 20), new THREE.TorusGeometry(0.125, 0.077, 10, 20), new THREE.TorusGeometry(0.07, 0.063, 10, 20)];
 const tipGeo = new THREE.ConeGeometry(0.063, 0.13, 12);
 const eyeGeo = new THREE.SphereGeometry(0.04, 8, 8), pupilGeo = new THREE.SphereGeometry(0.02, 8, 8);
 const eyeMat = new THREE.MeshBasicMaterial({ color: "white" }), pupilMat = new THREE.MeshBasicMaterial({ color: "black" });
@@ -462,58 +711,77 @@ function makePoop(golden) {
   const mat = golden ? goldMat : poopMat;
   poopGeos.forEach((geo, i) => {
     const ring = new THREE.Mesh(geo, mat);
-    ring.rotation.x = Math.PI / 2;
-    ring.position.y = 0.09 + i * 0.125;
-    ring.castShadow = true;
+    ring.rotation.x = Math.PI / 2; ring.position.y = 0.09 + i * 0.125; ring.castShadow = true;
     g.add(ring);
   });
-  const tip = new THREE.Mesh(tipGeo, mat);
-  tip.position.y = 0.45;
-  g.add(tip);
+  const tip = new THREE.Mesh(tipGeo, mat); tip.position.y = 0.45; g.add(tip);
   [-0.07, 0.07].forEach(x => {
     const eye = new THREE.Mesh(eyeGeo, eyeMat); eye.position.set(x, 0.23, 0.18);
     const pupil = new THREE.Mesh(pupilGeo, pupilMat); pupil.position.set(x, 0.23, 0.215);
     g.add(eye, pupil);
   });
-  if (golden) g.scale.setScalar(1.25);
+  g.scale.setScalar(golden ? 0.55 : 0.45);
+  // a soft glow ring on the ground so poop is easy to spot
+  const ring = new THREE.Mesh(new THREE.RingGeometry(0.3, 0.42, 24), new THREE.MeshBasicMaterial({
+    color: golden ? "#ffd23f" : "#ffffff", transparent: true, opacity: 0.35, depthWrite: false }));
+  ring.rotation.x = -Math.PI / 2; ring.position.y = 0.03;
+  g.add(ring);
   return g;
 }
 
 // =========================================================
-//  GAME LOGIC
+//  GAME RULES
 // =========================================================
-let S;
+let S = null;
 const rand = Math.random;
-const PLAYER_R = 0.24;   // how "wide" the player is when bumping into walls
-const CAR_HIT = 0.5;     // how close a car has to get to run you over (stay on the sidewalk!)
-const COP_HIT = 0.85;    // police jump out and grab you, so they can reach the sidewalk
-const EAT_DIST = 0.45;   // how close you have to get to eat poop
-const TURN_SPEED = 3.2;  // radians per second
+const PLAYER_R = 0.11;   // how "wide" you are when bumping into things
+const CAR_HIT = 0.4;     // a car this close runs you over - stay on the sidewalk!
+const COP_HIT = 0.72;    // police jump out and grab you, so they reach the sidewalk too
+const EAT_DIST = 0.32;
+const START = CFG.start;
 
-function characterIndex(eaten) {
-  let idx = 0;
-  CFG.characters.forEach((c, i) => { if (eaten >= c.needs) idx = i; });
-  return idx;
-}
+function characterIndex(eaten) { let idx = 0; CFG.characters.forEach((c, i) => { if (eaten >= c.needs) idx = i; }); return idx; }
 function wantedStars() { return Math.min(CFG.max_stars, 1 + Math.floor(S.eaten / CFG.poop_per_star)); }
-function policeSpeed() { return Math.max(120, CFG.police_speed_ms - (wantedStars() - 1) * CFG.police_speed_step); }
+function policeSpeed() { return Math.max(200, CFG.police_speed_ms - (wantedStars() - 1) * CFG.police_speed_step); }
+const runSpeed = () => 1000 / CFG.characters[S.charIdx].speed_ms;
 
 // Police and cars slide smoothly from square (fx, fy) to square (x, y)
 function placeAt(e, x, y) { e.x = e.fx = x; e.y = e.fy = y; e.t0 = 0; e.dur = 1; }
-function moveTo(e, x, y, now, dur) {
-  e.ang = Math.atan2(x - e.x, y - e.y);
-  e.fx = e.x; e.fy = e.y; e.x = x; e.y = y; e.t0 = now; e.dur = dur;
+function moveTo(e, x, y, now, dur) { e.ang = Math.atan2(x - e.x, y - e.y); e.fx = e.x; e.fy = e.y; e.x = x; e.y = y; e.t0 = now; e.dur = dur; }
+function renderPos(e, now) { const k = Math.min(1, (now - e.t0) / e.dur); return [e.fx + (e.x - e.fx) * k, e.fy + (e.y - e.fy) * k]; }
+const angDiff = (a, b) => Math.atan2(Math.sin(a - b), Math.cos(a - b));
+const manhattan = (x1, y1, x2, y2) => Math.abs(x1 - x2) + Math.abs(y1 - y2);
+
+// Does a person at (x, y) bump into a building, a tree, a lamp, the sea or the edge of the city?
+function bumps(x, y, r = PLAYER_R) {
+  if (x < -0.5 + r || y < -0.5 + r || x > COLS - 0.5 - r || y > ROWS - 0.5 - r) return true;
+  const rx = Math.round(x), ry = Math.round(y);
+  for (let ty = ry - 1; ty <= ry + 1; ty++) for (let tx = rx - 1; tx <= rx + 1; tx++) {
+    if (!inside(tx, ty)) continue;
+    if (MAP[ty][tx] === "w") {
+      const cx = Math.max(tx - 0.5, Math.min(x, tx + 0.5)), cy = Math.max(ty - 0.5, Math.min(y, ty + 0.5));
+      if ((cx - x) ** 2 + (cy - y) ** 2 < r * r) return true;
+    }
+    for (const b of BUCKET[ty][tx]) {
+      const cx = Math.max(b.x0, Math.min(x, b.x1)), cy = Math.max(b.y0, Math.min(y, b.y1));
+      if ((cx - x) ** 2 + (cy - y) ** 2 < r * r) return true;
+    }
+    for (const o of OBST[ty][tx]) if (Math.hypot(o.x - x, o.y - y) < r + o.r) return true;
+  }
+  return false;
 }
-function renderPos(e, now) {
-  const k = Math.min(1, (now - e.t0) / e.dur);
-  return [e.fx + (e.x - e.fx) * k, e.fy + (e.y - e.fy) * k];
+
+// Places poop can appear: middle of streets, parks and beach, and along the sidewalks
+const SPOTS = [];
+for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) if (!isWall(x, y)) SPOTS.push([x, y]);
+for (const R of RECTS) {
+  const x0 = R.x - 0.5, x1 = R.x + R.w - 0.5, y0 = R.y - 0.5, y1 = R.y + R.h - 0.5;
+  for (let t = 0.5; t < R.w; t += 1) { if (R.iT) SPOTS.push([x0 + t, y0 + R.iT / 2]); if (R.iB) SPOTS.push([x0 + t, y1 - R.iB / 2]); }
+  for (let t = 0.5; t < R.h; t += 1) { if (R.iL) SPOTS.push([x0 + R.iL / 2, y0 + t]); if (R.iR) SPOTS.push([x1 - R.iR / 2, y0 + t]); }
 }
-function turnToward(mesh, target) {
-  let d = target - mesh.rotation.y;
-  d = Math.atan2(Math.sin(d), Math.cos(d));
-  mesh.rotation.y += d * 0.25;
-}
-// The walkable square you're in, or (on a sidewalk) the nearest street square to you
+for (let i = SPOTS.length - 1; i >= 0; i--) if (bumps(SPOTS[i][0], SPOTS[i][1], 0.1)) SPOTS.splice(i, 1);
+
+// The street square you're on, or (on a sidewalk) the nearest street square to you
 function playerTile() {
   const x = S.player.x, y = S.player.y, rx = Math.round(x), ry = Math.round(y);
   if (!isWall(rx, ry)) return [rx, ry];
@@ -524,46 +792,20 @@ function playerTile() {
   }
   return bestT;
 }
-const manhattan = (x1, y1, x2, y2) => Math.abs(x1 - x2) + Math.abs(y1 - y2);
-
-// Does a circle at (x, y) bump into a building, a tree or the edge of the city?
-function bumps(x, y) {
-  const r2 = PLAYER_R * PLAYER_R;
-  for (let ty = Math.round(y - PLAYER_R); ty <= Math.round(y + PLAYER_R); ty++)
-    for (let tx = Math.round(x - PLAYER_R); tx <= Math.round(x + PLAYER_R); tx++) {
-      if (!inside(tx, ty)) return true;
-      const ch = MAP[ty][tx];
-      if (ch === "P" || ch === "T") {                   // tree trunk in the middle of the square
-        const tr = ch === "P" ? 0.12 : 0.3;
-        if ((tx - x) ** 2 + (ty - y) ** 2 < (PLAYER_R + tr) ** 2) return true;
-        continue;
-      }
-      const b = SOLID[ty][tx];
-      if (!b) continue;
-      const cx = Math.max(b.x0, Math.min(x, b.x1)), cy = Math.max(b.y0, Math.min(y, b.y1));
-      if ((cx - x) ** 2 + (cy - y) ** 2 < r2) return true;
-    }
-  return false;
-}
 
 function setPlayerModel() {
   if (S.player.mesh) scene.remove(S.player.mesh);
-  S.player.mesh = makeCharacter(CFG.characters[S.charIdx]);
+  S.player.mesh = makeHuman(CFG.characters[S.charIdx]);
   scene.add(S.player.mesh);
 }
-
-function resetPlayer() {
-  S.player.x = PLAYER_START[0]; S.player.y = PLAYER_START[1];
-  S.player.ang = Math.PI / 2; // facing east along the street
-}
+function resetPlayer() { S.player.x = START[0]; S.player.y = START[1]; S.player.ang = Math.PI; cam.yaw = Math.PI; }
 
 function newGame() {
-  if (S) [...S.police, ...S.poops, ...S.cars].forEach(e => scene.remove(e.mesh));
+  if (S) { [...S.police, ...S.poops, ...S.cars].forEach(e => scene.remove(e.mesh)); if (S.player.mesh) scene.remove(S.player.mesh); }
   S = {
-    player: { x: 0, y: 0, ang: 0, speedNow: 0, walkT: 0, mesh: S ? S.player.mesh : null },
-    police: [], poops: [], cars: [], eaten: 0, lives: CFG.lives, stars: 1,
-    started: false, over: false, msgUntil: 0, safeUntil: 0, popUntil: 0,
-    lastPolice: 0, lastCars: 0, lastFrame: 0, charIdx: 0,
+    player: { x: 0, y: 0, ang: 0, speedNow: 0, moving: false, mesh: null },
+    police: [], poops: [], cars: [], eaten: 0, lives: CFG.lives, stars: 1, charIdx: 0,
+    msgUntil: 0, safeUntil: 0, dieUntil: 0, lastPolice: 0, lastCars: 0, tipUntil: 0,
   };
   resetPlayer();
   setPlayerModel();
@@ -573,41 +815,43 @@ function newGame() {
   updateHud();
 }
 
+function farCrossroads(minDist) {
+  const [tx, ty] = playerTile();
+  const far = CROSSROADS.filter(([x, y]) => manhattan(x, y, tx, ty) >= minDist && !S.police.some(c => c.x === x && c.y === y));
+  const list = far.length ? far : CROSSROADS;
+  return list[Math.floor(rand() * list.length)];
+}
 function addPolice() {
   while (S.police.length < wantedStars()) {
-    const s = POLICE_SPAWNS[S.police.length % POLICE_SPAWNS.length];
-    const cop = { sx: s[0], sy: s[1], ang: 0, mesh: makeCar(null, true) };
-    placeAt(cop, s[0], s[1]);
+    const [x, y] = farCrossroads(14);
+    const cop = { ang: 0, mesh: makeCar(null, true) };
+    placeAt(cop, x, y);
     scene.add(cop.mesh);
     S.police.push(cop);
   }
 }
-
 function addTraffic() {
   let tries = 0;
   const [tx, ty] = playerTile();
-  while (S.cars.length < CFG.traffic_cars && tries++ < 300) {
+  while (S.cars.length < CFG.traffic_cars && tries++ < 500) {
     const horiz = rand() < 0.5;
     const line = horiz ? H_ROADS[Math.floor(rand() * H_ROADS.length)] : V_ROADS[Math.floor(rand() * V_ROADS.length)];
-    const pos = 1 + Math.floor(rand() * ((horiz ? COLS : ROWS) - 2));
+    const pos = Math.floor(rand() * (horiz ? COLS : ROWS));
     const x = horiz ? pos : line, y = horiz ? line : pos;
-    if (!isRoad(x, y) || manhattan(tx, ty, x, y) < 6 || S.cars.some(c => c.x === x && c.y === y)) continue;
+    if (!isRoad(x, y) || manhattan(tx, ty, x, y) < 5 || S.cars.some(c => c.x === x && c.y === y)) continue;
     const d = rand() < 0.5 ? 1 : -1;
     const car = { dx: horiz ? d : 0, dy: horiz ? 0 : d, mesh: makeCar(CAR_COLORS[S.cars.length % CAR_COLORS.length], false) };
     placeAt(car, x, y);
-    car.ang = Math.atan2(car.dx, car.dy);
-    car.mesh.rotation.y = car.ang;
+    car.ang = Math.atan2(car.dx, car.dy); car.mesh.rotation.y = car.ang;
     scene.add(car.mesh);
     S.cars.push(car);
   }
 }
-
 function fillPoop() {
   let tries = 0;
-  const [tx, ty] = playerTile();
-  while (S.poops.length < CFG.poop_on_map && tries++ < 500) {
-    const [x, y] = EMPTY[Math.floor(rand() * EMPTY.length)];
-    if (manhattan(tx, ty, x, y) <= 4 || S.poops.some(p => p.x === x && p.y === y)) continue;
+  while (S.poops.length < CFG.poop_on_map && tries++ < 800) {
+    const [x, y] = SPOTS[Math.floor(rand() * SPOTS.length)];
+    if (Math.hypot(x - S.player.x, y - S.player.y) < 5 || S.poops.some(p => Math.hypot(p.x - x, p.y - y) < 2)) continue;
     const golden = rand() < CFG.golden_chance;
     const mesh = makePoop(golden);
     mesh.position.set(wx(x), 0, wz(y));
@@ -618,66 +862,77 @@ function fillPoop() {
 }
 
 const bannerEl = document.getElementById("banner");
-function showMsg(text, now, ms = 1600) {
-  bannerEl.textContent = text;
-  bannerEl.style.display = "block";
+function showMsg(html, now, ms = 1800, color = "white") {
+  bannerEl.innerHTML = html; bannerEl.style.color = color; bannerEl.style.display = "block";
   S.msgUntil = now + ms;
 }
+const tipEl = document.getElementById("tip");
+function showTip(html, now, ms = 7000) { tipEl.innerHTML = html; tipEl.style.display = "block"; S.tipUntil = now + ms; }
 
-// ---------- Input: keyboard (hold keys) and on-screen joystick ----------
+// ---------- Input ----------
 const keys = {};
-const joy = { x: 0, y: 0 };   // -1..1, y = -1 is "push up"
-function readInput() {
+const joy = { x: 0, y: 0 };
+function readMove() {
   const k = n => (keys[n] ? 1 : 0);
-  let fwd = k("ArrowUp") + k("w") - k("ArrowDown") - k("s");
-  let turn = k("ArrowRight") + k("d") - k("ArrowLeft") - k("a");
-  if (Math.hypot(joy.x, joy.y) > 0.18) { fwd += -joy.y; turn += joy.x; }
-  const run = keys.Shift || Math.hypot(joy.x, joy.y) > 0.9;
-  return { fwd: Math.max(-1, Math.min(1, fwd)), turn: Math.max(-1, Math.min(1, turn)), run };
+  let fwd = k("arrowup") + k("w") - k("arrowdown") - k("s");
+  let side = k("arrowright") + k("d") - k("arrowleft") - k("a");
+  let mag = Math.min(1, Math.hypot(fwd, side));
+  let run = (SETTINGS.alwaysRun === "On") !== !!keys.shift;
+  const jm = Math.hypot(joy.x, joy.y);
+  if (jm > 0.15) { fwd = -joy.y; side = joy.x; mag = Math.min(1, jm); run = jm > 0.92; }
+  return { fwd, side, mag, run };
 }
 
-// ---------- Player: walk forward/back, turn left/right ----------
+// ---------- You: move the way the camera is looking (like most third-person games) ----------
 function updatePlayer(now, dt) {
-  const p = S.player, inp = readInput();
-  p.ang -= inp.turn * TURN_SPEED * dt;
-  const base = 1000 / CFG.characters[S.charIdx].speed_ms;    // squares per second
-  const speed = base * (inp.fwd < 0 ? 0.6 : inp.run ? 1.35 : 1) * inp.fwd;
-  const step = speed * dt;
-  const nx = p.x + Math.sin(p.ang) * step, ny = p.y + Math.cos(p.ang) * step;
-  if (!bumps(nx, p.y)) p.x = nx;     // move in x and y separately so you slide along walls
-  if (!bumps(p.x, ny)) p.y = ny;
-  p.speedNow = Math.abs(speed);
-  p.walkT += step * 6;
-
-  // Eat poop?
-  const i = S.poops.findIndex(q => Math.hypot(q.x - p.x, q.y - p.y) < EAT_DIST);
-  if (i >= 0) {
-    const poop = S.poops[i];
-    scene.remove(poop.mesh);
-    S.poops.splice(i, 1);
-    S.eaten += poop.value;
-    const oldStars = S.stars;
-    S.stars = wantedStars();
-    const newIdx = characterIndex(S.eaten);
-    if (newIdx > S.charIdx) {
-      S.charIdx = newIdx;
-      setPlayerModel();
-      S.popUntil = now + 600;
-      showMsg("UPGRADE! YOU ARE NOW " + CFG.characters[newIdx].name.toUpperCase(), now, 2300);
-    } else if (S.stars > oldStars) {
-      showMsg("WANTED LEVEL " + S.stars + " ⭐", now);
-    } else if (poop.golden) {
-      showMsg("GOLDEN POOP! +3", now, 1000);
-    }
-    if (S.stars > oldStars) flashStars();
-    addPolice();
-    fillPoop();
-    updateHud();
+  const p = S.player, inp = readMove();
+  p.moving = inp.mag > 0.1;
+  let speed = 0;
+  if (p.moving) {
+    const fx = Math.sin(cam.yaw), fy = Math.cos(cam.yaw);              // camera forward
+    const rx = Math.sin(cam.yaw - Math.PI / 2), ry = Math.cos(cam.yaw - Math.PI / 2); // camera right
+    let mx = fx * inp.fwd + rx * inp.side, my = fy * inp.fwd + ry * inp.side;
+    const l = Math.hypot(mx, my) || 1; mx /= l; my /= l;
+    const target = Math.atan2(mx, my);
+    p.ang += angDiff(target, p.ang) * Math.min(1, dt * 12);              // turn to face where you walk
+    speed = inp.run ? runSpeed() : WALK_SPEED * Math.max(0.4, inp.mag);
+    const step = speed * dt;
+    if (!bumps(p.x + mx * step, p.y)) p.x += mx * step;                  // x and y separately = slide along walls
+    if (!bumps(p.x, p.y + my * step)) p.y += my * step;
   }
+  p.speedNow += (speed - p.speedNow) * Math.min(1, dt * 10);
+
+  const i = S.poops.findIndex(q => Math.hypot(q.x - p.x, q.y - p.y) < EAT_DIST);
+  if (i >= 0) eatPoop(i, now);
+}
+
+function eatPoop(i, now) {
+  const poop = S.poops[i];
+  scene.remove(poop.mesh);
+  S.poops.splice(i, 1);
+  S.eaten += poop.value;
+  const oldStars = S.stars;
+  S.stars = wantedStars();
+  const newIdx = characterIndex(S.eaten);
+  if (newIdx > S.charIdx) {
+    S.charIdx = newIdx;
+    const ang = S.player.ang;
+    setPlayerModel();
+    S.player.ang = ang;
+    showMsg("UPGRADED<small>You are now " + CFG.characters[newIdx].name + "</small>", now, 2600, "#ffd23f");
+  } else if (S.stars > oldStars) {
+    showMsg("WANTED LEVEL " + S.stars + "<small>More police are coming</small>", now, 2000, "#ffd23f");
+  } else if (poop.golden) {
+    showMsg("+3<small>Golden poop!</small>", now, 1200, "#ffd23f");
+  }
+  if (S.stars > oldStars) flashStars();
+  addPolice();
+  fillPoop();
+  updateHud();
 }
 
 // ---------- Police AI (breadth-first search) ----------
-// Works out how many steps every square is from the player.
+// Works out how many steps every street square is from you.
 function distanceMap() {
   const dist = Array.from({ length: ROWS }, () => Array(COLS).fill(Infinity));
   const [px, py] = playerTile();
@@ -685,30 +940,22 @@ function distanceMap() {
   dist[py][px] = 0;
   for (let qi = 0; qi < queue.length; qi++) {
     const [x, y] = queue[qi];
-    for (const [dx, dy] of Object.values(DIRS)) {
+    for (const [dx, dy] of DIRS) {
       const nx = x + dx, ny = y + dy;
-      if (!isWall(nx, ny) && dist[ny][nx] === Infinity) {
-        dist[ny][nx] = dist[y][x] + 1;
-        queue.push([nx, ny]);
-      }
+      if (!isWall(nx, ny) && dist[ny][nx] === Infinity) { dist[ny][nx] = dist[y][x] + 1; queue.push([nx, ny]); }
     }
   }
   return dist;
 }
-
 function stepPolice(now) {
   const dist = distanceMap(), speed = policeSpeed();
   S.police.forEach((cop, i) => {
-    const options = Object.values(DIRS)
-      .map(([dx, dy]) => [cop.x + dx, cop.y + dy])
+    const options = DIRS.map(([dx, dy]) => [cop.x + dx, cop.y + dy])
       .filter(([x, y]) => !isWall(x, y) && !S.police.some(o => o !== cop && o.x === x && o.y === y));
     if (!options.length) return;
-    let choice;
-    if (i > 0 && rand() < CFG.police_randomness) {
-      choice = options[Math.floor(rand() * options.length)];
-    } else {
-      choice = options.reduce((a, b) => (dist[b[1]][b[0]] < dist[a[1]][a[0]] ? b : a));
-    }
+    const choice = i > 0 && rand() < CFG.police_randomness
+      ? options[Math.floor(rand() * options.length)]
+      : options.reduce((a, b) => (dist[b[1]][b[0]] < dist[a[1]][a[0]] ? b : a));
     moveTo(cop, choice[0], choice[1], now, speed);
   });
 }
@@ -731,228 +978,379 @@ function stepCars(now) {
 }
 
 function checkHit(now) {
-  if (now < S.safeUntil || S.over) return;
+  if (now < S.safeUntil) return;
   const near = d => e => { const [x, y] = renderPos(e, now); return Math.hypot(x - S.player.x, y - S.player.y) < d; };
-  let reason = null;
-  if (S.police.some(near(COP_HIT))) reason = "CAUGHT BY THE POLICE 🚓";
-  else if (S.cars.some(near(CAR_HIT))) reason = "RUN OVER! 🚗";
-  if (!reason) return;
+  if (S.police.some(near(COP_HIT))) caught("CAUGHT", "The police got you", now);
+  else if (S.cars.some(near(CAR_HIT))) caught("RUN OVER", "Stay on the sidewalk!", now);
+}
+function caught(title, sub, now) {
   S.lives--;
   updateHud();
+  mode = "dying";
+  S.dieUntil = now + 2000;
+  renderer.domElement.style.filter = "grayscale(1) contrast(1.15) brightness(.85)";
+  showMsg(title + "<small>" + sub + "</small>", now, 2000, "#ff4b4b");
+}
+function afterCaught(now) {
+  renderer.domElement.style.filter = "";
   if (S.lives <= 0) {
-    S.over = true;
-    if (S.eaten > best) { best = S.eaten; saveBest(best); updateHud(); }
-    showOverlay("GAME OVER", reason + "<br>You ate " + S.eaten + " 💩 &nbsp;·&nbsp; Best: " + best +
-                "<br><br>Tap or press Space to play again");
+    if (S.eaten > best) { best = S.eaten; store.set("best", best); }
+    updateHud();
+    openPanel("over");
     return;
   }
   resetPlayer();
-  S.police.forEach(c => placeAt(c, c.sx, c.sy));
-  S.safeUntil = now + 2000;
-  showMsg(reason, now, 1800);
+  S.police.forEach(c => { const [x, y] = farCrossroads(14); placeAt(c, x, y); });
+  S.safeUntil = now + 2500;
+  S.lastPolice = S.lastCars = now;
+  mode = "play";
 }
 
-// ---------- HUD, radar and overlay ----------
-const overlayEl = document.getElementById("overlay");
-function showOverlay(title, subHtml) {
-  document.getElementById("oTitle").textContent = title;
-  document.getElementById("oSub").innerHTML = subHtml;
-  overlayEl.style.display = "flex";
-}
-
+// ---------- HUD and radar ----------
 const starsEl = document.getElementById("stars");
-function flashStars() {
-  starsEl.classList.remove("flash"); void starsEl.offsetWidth; starsEl.classList.add("flash");
-}
+function flashStars() { starsEl.classList.remove("flash"); void starsEl.offsetWidth; starsEl.classList.add("flash"); }
 function updateHud() {
-  const ch = CFG.characters[S.charIdx];
-  document.getElementById("hChar").textContent = ch.face + " " + ch.name.toUpperCase();
-  const nextC = CFG.characters[S.charIdx + 1];
-  document.getElementById("hNext").textContent =
-    nextC ? "Next: " + nextC.name + " in " + (nextC.needs - S.eaten) + " 💩" : "MAX LEVEL!";
-  document.getElementById("hBest").textContent = "Best: " + best;
+  const ch = CFG.characters[S.charIdx], nextC = CFG.characters[S.charIdx + 1];
   document.getElementById("score").textContent = "💩 " + S.eaten;
   document.getElementById("lives").textContent = "❤️".repeat(Math.max(0, S.lives));
+  document.getElementById("who").innerHTML = ch.name.toUpperCase() +
+    "<small>" + (nextC ? "Next: " + nextC.name + " in " + (nextC.needs - S.eaten) + " 💩" : "Max level!") + " · Best " + best + "</small>";
   let stars = "";
   for (let i = 1; i <= CFG.max_stars; i++) stars += i <= S.stars ? "★" : '<span class="off">★</span>';
   starsEl.innerHTML = stars;
 }
 
-const RT = 10; // radar pixels per map square
+const RT = 7; // radar pixels per map square
 const radarMap = document.createElement("canvas");
 radarMap.width = COLS * RT; radarMap.height = ROWS * RT;
 {
   const g = radarMap.getContext("2d");
   for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) {
     const ch = MAP[y][x];
-    g.fillStyle = ch === "." ? "#9a9a9a" : ch === "g" || ch === "T" ? "#4f9a3a" : "#3a3a40";
+    g.fillStyle = { ".": "#8e8e8e", g: "#4f8f3a", T: "#4f8f3a", s: "#cdb98a", w: "#2d5f80" }[ch] || "#34343b";
     g.fillRect(x * RT, y * RT, RT, RT);
   }
 }
 const radar = document.getElementById("radar").getContext("2d");
-// The radar turns with you, so "up" on the radar is always the way you're facing
+// The radar turns with the camera, so "up" is always the way the camera looks
 function drawRadar(now) {
-  const W = 240, p = S.player;
-  radar.fillStyle = "#222"; radar.fillRect(0, 0, W, W);
+  const W = 260, p = S.player;
+  radar.fillStyle = "#2d5f80"; radar.fillRect(0, 0, W, W);
   radar.save();
-  radar.translate(W / 2, W / 2);
-  radar.scale(2, 2);
-  radar.rotate(p.ang - Math.PI);
+  radar.translate(W / 2, W / 2); radar.scale(2, 2); radar.rotate(cam.yaw - Math.PI);
   radar.drawImage(radarMap, -(p.x + 0.5) * RT, -(p.y + 0.5) * RT);
-  const dot = (x, y, color, r) => {
-    radar.fillStyle = color;
-    radar.beginPath(); radar.arc((x - p.x) * RT, (y - p.y) * RT, r, 0, Math.PI * 2); radar.fill();
-  };
-  S.poops.forEach(q => dot(q.x, q.y, q.golden ? "#ffd23f" : "#a0622d", 3));
-  S.cars.forEach(c => { const [x, y] = renderPos(c, now); dot(x, y, "#dddddd", 2.5); });
-  S.police.forEach((c, i) => { const [x, y] = renderPos(c, now); dot(x, y, Math.floor(now / 250 + i) % 2 ? "#ff2030" : "#3070ff", 4); });
+  const dot = (x, y, color, r) => { radar.fillStyle = color; radar.beginPath(); radar.arc((x - p.x) * RT, (y - p.y) * RT, r, 0, 6.29); radar.fill(); };
+  S.poops.forEach(q => dot(q.x, q.y, q.golden ? "#ffd23f" : "#8a5a2b", 2.6));
+  S.police.forEach((c, i) => { const [x, y] = renderPos(c, now); dot(x, y, Math.floor(now / 250 + i) % 2 ? "#ff2030" : "#3070ff", 3.6); });
   radar.restore();
-  // you: an arrow in the middle, always pointing up
-  radar.save();
-  radar.translate(W / 2, W / 2); radar.scale(2, 2);
-  radar.fillStyle = "white"; radar.strokeStyle = "black"; radar.lineWidth = 1;
-  radar.beginPath(); radar.moveTo(0, -6); radar.lineTo(4.5, 5); radar.lineTo(0, 2.5); radar.lineTo(-4.5, 5);
-  radar.closePath(); radar.fill(); radar.stroke();
-  radar.restore();
+  radar.fillStyle = "white"; radar.strokeStyle = "rgba(0,0,0,.8)"; radar.lineWidth = 2;
+  radar.beginPath(); radar.arc(W / 2, W / 2, 6, 0, 6.29); radar.fill(); radar.stroke();
 }
 
 // =========================================================
-//  GAME LOOP
+//  CAMERA: free orbit around you (hold right mouse button / drag on phone)
 // =========================================================
-const camPos = new THREE.Vector3(0, 22, 13);
-const camLook = new THREE.Vector3();
-const camGoal = new THREE.Vector3(), lookGoal = new THREE.Vector3();
-
-// shortest distance from point (px, py) to the line segment (ax, ay)-(bx, by)
-function segDist(px, py, ax, ay, bx, by) {
-  const vx = bx - ax, vy = by - ay;
-  const t = Math.max(0, Math.min(1, ((px - ax) * vx + (py - ay) * vy) / (vx * vx + vy * vy || 1)));
-  return Math.hypot(px - (ax + t * vx), py - (ay + t * vy));
+const cam = { yaw: Math.PI, pitch: 0.3, dist: 2.1, curD: 2.1, lastInput: -1e9 };
+const TARGET_H = HUMAN_H * 0.78;
+const camPos = new THREE.Vector3(), camLook = new THREE.Vector3();
+function insideBuilding(x, y, h) {
+  const tx = Math.round(x), ty = Math.round(y);
+  if (!inside(tx, ty)) return false;
+  return BUCKET[ty][tx].some(b => x > b.x0 - 0.05 && x < b.x1 + 0.05 && y > b.y0 - 0.05 && y < b.y1 + 0.05 && h < b.h + 0.08);
 }
-
-function loop(now) {
-  const dt = Math.min(0.05, (now - (S.lastFrame || now)) / 1000);
-  S.lastFrame = now;
-  if (S.started && !S.over) {
-    updatePlayer(now, dt);
-    if (now - S.lastPolice >= policeSpeed()) { S.lastPolice = now; stepPolice(now); }
-    if (now - S.lastCars >= CFG.car_speed_ms) { S.lastCars = now; stepCars(now); }
-    checkHit(now);
+function updateGameCamera(now, dt) {
+  const p = S.player;
+  // like most open-world games: if you're walking and haven't touched the camera for a bit, it slowly swings behind you
+  if (p.moving && now - cam.lastInput > 2500) cam.yaw += angDiff(p.ang, cam.yaw) * Math.min(1, dt * 0.8);
+  const bx = -Math.sin(cam.yaw), by = -Math.cos(cam.yaw), tanp = Math.tan(cam.pitch);
+  const hd = cam.dist * Math.cos(cam.pitch);
+  let lim = hd;                                     // move the camera closer if a building is in the way
+  for (let s = 0.1; s <= hd; s += 0.04) {
+    if (insideBuilding(p.x + bx * s, p.y + by * s, TARGET_H + tanp * s)) { lim = Math.max(0.2, s - 0.1); break; }
   }
-  if (now > S.msgUntil) bannerEl.style.display = "none";
-
-  // Player model: position, facing, walking animation
-  const p = S.player, pm = S.player.mesh, u = pm.userData;
-  pm.position.set(wx(p.x), 0, wz(p.y));
-  pm.rotation.y = p.ang;
-  const swing = p.speedNow > 0.1 ? Math.sin(p.walkT) * 0.7 : 0;
-  u.legL.rotation.x = swing; u.legR.rotation.x = -swing;
-  u.armL.rotation.x = -swing * 0.8; u.armR.rotation.x = swing * 0.8;
-  u.torso.position.y = 0.62 + Math.abs(Math.sin(p.walkT)) * (p.speedNow > 0.1 ? 0.03 : 0);
-  pm.visible = !(now < S.safeUntil && Math.floor(now / 120) % 2 === 0);
-  pm.scale.setScalar(now < S.popUntil ? 1 + Math.sin(((S.popUntil - now) / 600) * Math.PI) * 0.5 : 1);
-
-  // Police cars and traffic
-  for (const car of [...S.police, ...S.cars]) {
-    const [cx, cy] = renderPos(car, now);
-    car.mesh.position.set(wx(cx), 0, wz(cy));
-    turnToward(car.mesh, car.ang);
-  }
-  S.police.forEach((cop, i) => {
-    const on = Math.floor(now / 200 + i) % 2;
-    cop.mesh.userData.lights[0].material.color.set(on ? "#ff2030" : "#400008");
-    cop.mesh.userData.lights[1].material.color.set(on ? "#08103a" : "#2050ff");
-  });
-
-  // Poop spins and bobs
-  S.poops.forEach((q, i) => {
-    q.mesh.rotation.y += q.golden ? 0.05 : 0.02;
-    q.mesh.position.y = Math.sin(now / 300 + i) * 0.05 + 0.03;
-  });
-
-  // Camera: behind and above you (third person), or high in the sky
-  const follow = cameraMode === "follow";
-  const fx = Math.sin(p.ang), fz = Math.cos(p.ang);
-  if (follow) {
-    camGoal.set(wx(p.x) - fx * 3.3, 2.5, wz(p.y) - fz * 3.3);
-    lookGoal.set(wx(p.x) + fx * 1.6, 0.7, wz(p.y) + fz * 1.6);
-  } else {
-    camGoal.set(0, 22, 13);
-    lookGoal.set(0, 0, 0.5);
-  }
-  camPos.lerp(camGoal, follow ? 0.12 : 0.06);
-  camLook.lerp(lookGoal, 0.2);
+  cam.curD = lim < cam.curD ? lim : cam.curD + (lim - cam.curD) * Math.min(1, dt * 3);
+  const d = cam.curD;
+  camPos.set(wx(p.x + bx * d), Math.max(0.06, TARGET_H + tanp * d), wz(p.y + by * d));
+  camLook.set(wx(p.x), TARGET_H, wz(p.y));
   camera.position.copy(camPos);
   camera.lookAt(camLook);
-
-  // Buildings between the camera and you shrink so they don't block the view
-  const camTX = camPos.x + COLS / 2 - 0.5, camTY = camPos.z + ROWS / 2 - 0.5;
-  for (const b of BUILDINGS) {
-    const hide = follow && segDist(b.x, b.y, p.x, p.y, camTX, camTY) < 0.8;
-    const target = hide ? Math.min(1, 0.3 / b.h) : 1;
-    if (Math.abs(b.k - target) > 0.001) {
-      b.k += (target - b.k) * 0.2;
-      b.mesh.scale.y = b.h * b.k;
-    }
-  }
-
-  drawRadar(now);
-  renderer.render(scene, camera);
-  requestAnimationFrame(loop);
+  aimSun(camLook.x, camLook.z);
+}
+function updateMenuCamera(now) {
+  const a = now * 0.00003;
+  camera.position.set(Math.sin(a) * 19, 8.5, Math.cos(a) * 15 + 1);
+  camera.lookAt(0, 1.8, -2);
+  aimSun(0, -2);
 }
 
+const SENS = { Low: 0.0035, Medium: 0.006, High: 0.0095 };
+let dragId = null, lastX = 0, lastY = 0;
+stage.addEventListener("contextmenu", e => e.preventDefault());
+stage.addEventListener("pointerdown", e => {
+  if (mode !== "play" && mode !== "dying") return;
+  if (e.pointerType === "mouse" && e.button !== 2) return;   // right mouse button turns the camera
+  dragId = e.pointerId; lastX = e.clientX; lastY = e.clientY;
+  stage.setPointerCapture(e.pointerId);
+  e.preventDefault();
+});
+stage.addEventListener("pointermove", e => {
+  if (e.pointerId !== dragId) return;
+  const s = SENS[SETTINGS.sensitivity] * (e.pointerType === "mouse" ? 1 : 1.4);
+  cam.yaw -= (e.clientX - lastX) * s;
+  cam.pitch += (e.clientY - lastY) * s * (SETTINGS.invertY === "On" ? -1 : 1);
+  cam.pitch = Math.max(-0.1, Math.min(1.3, cam.pitch));
+  lastX = e.clientX; lastY = e.clientY;
+  cam.lastInput = performance.now();
+});
+const endDrag = e => { if (e.pointerId === dragId) dragId = null; };
+stage.addEventListener("pointerup", endDrag);
+stage.addEventListener("pointercancel", endDrag);
+stage.addEventListener("wheel", e => {
+  if (mode !== "play") return;
+  e.preventDefault();
+  cam.dist = Math.max(0.7, Math.min(5, cam.dist * (e.deltaY > 0 ? 1.1 : 0.9)));
+}, { passive: false });
+
 // =========================================================
-//  CONTROLS
+//  MENUS: main menu, panels, pause, game over
 // =========================================================
-function start() {
-  if (S.over) newGame();
-  if (!S.started) {
-    S.started = true;
-    S.safeUntil = performance.now() + 1500;
-    overlayEl.style.display = "none";
+let mode = "loading";   // loading | menu | play | paused | dying | over
+const hudEl = document.getElementById("hud"), menuEl = document.getElementById("menu");
+const cardsEl = document.getElementById("cards"), panelEl = document.getElementById("panel"), ibarEl = document.getElementById("ibar");
+
+const CARDS = [
+  { id: "play", label: "PLAY", sub: "Eat. Run. Escape.", icon: "💩", art: "linear-gradient(160deg, #ffb36b, #c2456e 55%, #3a1f5c)" },
+  { id: "characters", label: "CHARACTERS", sub: "Who you can become", icon: "🏃", art: "linear-gradient(160deg, #3fb7a4, #1d4f6e 60%, #101828)" },
+  { id: "controls", label: "CONTROLS", sub: "Keyboard, mouse, touch", icon: "🎮", art: "linear-gradient(160deg, #8a8fa8, #3a3f5c 60%, #14141f)" },
+  { id: "settings", label: "SETTINGS", sub: "Graphics & camera", icon: "⚙️", art: "linear-gradient(160deg, #e0b85a, #8a5a2b 60%, #2a1a10)" },
+  { id: "credits", label: "CREDITS", sub: "Who made this", icon: "🎬", art: "linear-gradient(160deg, #e06a6a, #6a1f3a 60%, #1a0a14)" },
+];
+const OPTIONS = { graphics: ["High", "Low"], sensitivity: ["Low", "Medium", "High"], invertY: ["Off", "On"], alwaysRun: ["Off", "On"] };
+const M = { where: "cards", card: 0, panel: null, row: 0, back: null };
+
+function panelDef(id) {
+  const info = (label, value) => ({ label, value, info: true });
+  const setting = (label, key, after) => ({ label, value: () => "◀ " + SETTINGS[key] + " ▶", change: dir => {
+    const o = OPTIONS[key], i = (o.indexOf(SETTINGS[key]) + dir + o.length) % o.length;
+    SETTINGS[key] = o[i]; store.set("settings", SETTINGS); if (after) after();
+  } });
+  switch (id) {
+    case "characters": return { title: "CHARACTERS", rows: CFG.characters.map((c, i) =>
+      info('<span style="color:' + c.color + '">■</span> ' + c.name, i === 0 ? "You start as " + c.name : "Eat " + c.needs + " 💩")),
+      desc: "Every character you unlock runs faster than the one before. Golden poop is worth 3." };
+    case "controls": return { title: "CONTROLS", rows: [
+      info("Move", "W A S D / arrow keys"), info("Run", "Hold Shift"), info("Look around", "Hold right mouse button + drag"),
+      info("Zoom camera", "Mouse wheel"), info("Camera behind you", "C"), info("Pause menu", "Esc or P"),
+      info("Phone: move / run", "Joystick (all the way = run)"), info("Phone: look around", "Drag on the game") ],
+      desc: "You walk the way the camera faces. Click the game first so it can hear your keyboard." };
+    case "settings": return { title: "SETTINGS", rows: [
+      setting("Graphics", "graphics", applyGraphics), setting("Camera speed", "sensitivity"),
+      setting("Invert camera up/down", "invertY"), setting("Always run", "alwaysRun") ],
+      desc: "Low graphics turns off shadows. Use it if the game is slow on your device." };
+    case "credits": return { title: "CREDITS", rows: [
+      info("Game", "Our class group · KMIDS"), info("Made with", "Python, Streamlit, Three.js"),
+      info("Person model", "Soldier (three.js examples)"), info("Animations", "Mixamo"), info("Police AI", "Breadth-first search") ],
+      desc: "A practice project for 'Build Your First AI Project'. All characters and places are made up." };
+    case "pause": return { title: "PAUSED", rows: [
+      { label: "Resume", act: resume }, { label: "Controls", act: () => openPanel("controls", "pause") },
+      { label: "Settings", act: () => openPanel("settings", "pause") }, { label: "Quit to main menu", act: showMain } ],
+      desc: "Score " + S.eaten + " 💩 · " + "★".repeat(S.stars) + " · " + CFG.characters[S.charIdx].name };
+    case "over": return { title: "GAME OVER", rows: [ { label: "Play again", act: startGame }, { label: "Main menu", act: showMain } ],
+      desc: "You ate " + S.eaten + " 💩 and became " + CFG.characters[S.charIdx].name + ". Best: " + best + "." };
   }
 }
 
-const GAME_KEYS = ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "w", "a", "s", "d", "Shift"];
+function renderMenu() {
+  cardsEl.classList.toggle("hidden", M.where !== "cards");
+  panelEl.classList.toggle("hidden", M.where !== "panel");
+  if (M.where === "cards") {
+    cardsEl.innerHTML = CARDS.map((c, i) =>
+      '<div class="card' + (i === M.card ? " sel" : "") + '" data-i="' + i + '"><div class="art" style="background:' + c.art + '">' + c.icon +
+      '</div><div class="lbl">' + c.label + "<small>" + c.sub + "</small></div></div>").join("");
+    ibarEl.innerHTML = "<span><b>⏎</b>Select</span><span><b>← →</b>Navigate</span>";
+  } else {
+    const p = panelDef(M.panel);
+    const rows = p.rows.map((r, i) => {
+      const v = typeof r.value === "function" ? r.value() : (r.value || "");
+      return '<div class="row' + (i === M.row && !r.info ? " sel" : "") + (r.info ? " info" : "") + '" data-i="' + i + '"><span>' +
+             r.label + '</span><span class="v">' + v + "</span></div>";
+    }).join("");
+    panelEl.innerHTML = '<div class="phead">' + p.title + "</div>" + rows + (p.desc ? '<div class="pdesc">' + p.desc + "</div>" : "");
+    const canBack = M.back !== null;
+    ibarEl.innerHTML = "<span><b>⏎</b>Select</span><span><b>↑ ↓</b>Navigate</span>" +
+      (p.rows.some(r => r.change) ? "<span><b>◀ ▶</b>Change</span>" : "") + (canBack ? "<span><b>Esc</b>Back</span>" : "");
+  }
+}
+function selectable(p) { return p.rows.map((r, i) => (r.info ? -1 : i)).filter(i => i >= 0); }
+function openPanel(id, back = "cards") {
+  if (id === "pause" || id === "over") { mode = id === "pause" ? "paused" : "over"; back = id === "pause" ? "resume" : null; }
+  M.where = "panel"; M.panel = id; M.back = back;
+  const sel = selectable(panelDef(id)); M.row = sel.length ? sel[0] : 0;
+  menuEl.classList.remove("hidden");
+  menuEl.classList.toggle("dark", mode !== "menu");
+  document.getElementById("mtop").classList.toggle("hidden", mode !== "menu");
+  renderMenu();
+}
+function menuBack() {
+  if (M.back === "cards") { M.where = "cards"; renderMenu(); }
+  else if (M.back === "pause") openPanel("pause");
+  else if (M.back === "resume") resume();
+}
+function menuActivate() {
+  if (M.where === "cards") {
+    const id = CARDS[M.card].id;
+    if (id === "play") startGame(); else openPanel(id, "cards");
+    return;
+  }
+  const r = panelDef(M.panel).rows[M.row];
+  if (!r) return;
+  if (r.act) r.act(); else if (r.change) { r.change(1); renderMenu(); }
+}
+function menuMove(dx, dy) {
+  if (M.where === "cards") { M.card = (M.card + dx + dy + CARDS.length) % CARDS.length; renderMenu(); return; }
+  const p = panelDef(M.panel), sel = selectable(p);
+  if (dy && sel.length) { const j = sel.indexOf(M.row); M.row = sel[(j + dy + sel.length) % sel.length]; }
+  if (dx && p.rows[M.row] && p.rows[M.row].change) p.rows[M.row].change(dx);
+  renderMenu();
+}
+menuEl.addEventListener("pointermove", e => {
+  const el = e.target.closest("[data-i]"); if (!el || e.pointerType !== "mouse") return;
+  const i = +el.dataset.i;
+  if (M.where === "cards" && i !== M.card) { M.card = i; renderMenu(); }
+  if (M.where === "panel" && i !== M.row && !panelDef(M.panel).rows[i].info) { M.row = i; renderMenu(); }
+});
+menuEl.addEventListener("click", e => {
+  const el = e.target.closest("[data-i]"); if (!el) return;
+  const i = +el.dataset.i;
+  if (M.where === "cards") { M.card = i; menuActivate(); }
+  else if (!panelDef(M.panel).rows[i].info) { M.row = i; menuActivate(); }
+});
+
+function showMain() {
+  renderer.domElement.style.filter = "";
+  mode = "menu";
+  hudEl.classList.add("hidden");
+  menuEl.classList.remove("hidden", "dark");
+  document.getElementById("mtop").classList.remove("hidden");
+  M.where = "cards"; M.back = null;
+  renderMenu();
+}
+function startGame() {
+  newGame();
+  mode = "play";
+  const now = performance.now();
+  S.safeUntil = now + 2500; S.lastPolice = S.lastCars = now;
+  menuEl.classList.add("hidden");
+  hudEl.classList.remove("hidden");
+  showTip("Eat 💩 to level up. Stay on the <b>sidewalk</b> - traffic can run you over. " +
+          "The more you eat, the more police chase you.<br><br><b>Hold right mouse button</b> to look around · <b>Shift</b> to run · <b>Esc</b> for the menu", now, 9000);
+}
+function pause() { openPanel("pause"); }
+function resume() {
+  menuEl.classList.add("hidden");
+  mode = "play";
+  const now = performance.now();
+  S.lastPolice = S.lastCars = now;
+}
+
+// ---------- keyboard ----------
+const MOVE_KEYS = ["arrowup", "arrowdown", "arrowleft", "arrowright", "w", "a", "s", "d", "shift"];
 document.addEventListener("keydown", e => {
-  const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
-  if (GAME_KEYS.includes(k)) { e.preventDefault(); keys[k] = true; if (k !== "Shift") start(); }
-  else if (e.key === " " || e.key === "Enter") { e.preventDefault(); start(); }
-  else if (k === "c") toggleCamera();
+  const k = e.key.toLowerCase();
+  if (mode === "menu" || mode === "paused" || mode === "over") {
+    const nav = { arrowleft: [-1, 0], a: [-1, 0], arrowright: [1, 0], d: [1, 0], arrowup: [0, -1], w: [0, -1], arrowdown: [0, 1], s: [0, 1] };
+    if (nav[k]) { e.preventDefault(); menuMove(...nav[k]); }
+    else if (k === "enter" || k === " ") { e.preventDefault(); menuActivate(); }
+    else if (k === "escape" || k === "backspace") { e.preventDefault(); menuBack(); }
+    return;
+  }
+  if (mode !== "play" && mode !== "dying") return;
+  if (k === "escape" || k === "p") { e.preventDefault(); if (mode === "play") pause(); return; }
+  if (MOVE_KEYS.includes(k)) { e.preventDefault(); keys[k] = true; }
+  if (k === "c") { cam.yaw = S.player.ang; cam.lastInput = performance.now(); }
 });
-document.addEventListener("keyup", e => {
-  const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
-  keys[k] = false;
-});
+document.addEventListener("keyup", e => { keys[e.key.toLowerCase()] = false; });
 window.addEventListener("blur", () => { for (const k in keys) keys[k] = false; });
 
-// Joystick
+// ---------- phone joystick ----------
 const joyEl = document.getElementById("joy"), knob = document.getElementById("knob");
 let joyId = null;
 function moveJoy(e) {
   const r = joyEl.getBoundingClientRect();
   let dx = e.clientX - (r.left + r.width / 2), dy = e.clientY - (r.top + r.height / 2);
-  const max = r.width / 2 - 20, len = Math.hypot(dx, dy);
+  const max = r.width / 2 - 18, len = Math.hypot(dx, dy);
   if (len > max) { dx *= max / len; dy *= max / len; }
   joy.x = dx / max; joy.y = dy / max;
   knob.style.transform = "translate(" + dx + "px, " + dy + "px)";
 }
-joyEl.addEventListener("pointerdown", e => {
-  e.preventDefault(); joyId = e.pointerId; joyEl.setPointerCapture(e.pointerId); moveJoy(e); start();
-});
+joyEl.addEventListener("pointerdown", e => { e.preventDefault(); joyId = e.pointerId; joyEl.setPointerCapture(e.pointerId); moveJoy(e); });
 joyEl.addEventListener("pointermove", e => { if (e.pointerId === joyId) moveJoy(e); });
 const endJoy = e => { if (e.pointerId !== joyId) return; joyId = null; joy.x = joy.y = 0; knob.style.transform = ""; };
 joyEl.addEventListener("pointerup", endJoy);
 joyEl.addEventListener("pointercancel", endJoy);
+document.getElementById("pauseBtn").addEventListener("click", () => { if (mode === "play") pause(); });
 
-function toggleCamera() { cameraMode = cameraMode === "follow" ? "overview" : "follow"; }
-document.getElementById("cam").addEventListener("pointerdown", e => { e.preventDefault(); toggleCamera(); });
-stage.addEventListener("pointerdown", () => start());
+// =========================================================
+//  MAIN LOOP
+// =========================================================
+let lastT = performance.now();
+function loop(now) {
+  const dt = Math.min(0.05, (now - lastT) / 1000);
+  lastT = now;
+  waterTex.offset.x += dt * 0.012; waterTex.offset.y += dt * 0.007;
 
-newGame();
-window.gameReady = true;
-showOverlay("💩 POOP RUN: CITY", "Eat poop. Dodge traffic. Escape the police.<br><br>Tap here, then use the joystick or W A S D");
+  if (S) {
+    if (mode === "play") {
+      updatePlayer(now, dt);
+      if (now - S.lastPolice >= policeSpeed()) { S.lastPolice = now; stepPolice(now); }
+      if (now - S.lastCars >= CFG.car_speed_ms) { S.lastCars = now; stepCars(now); }
+      checkHit(now);
+    } else if (mode === "menu") {
+      if (now - S.lastCars >= CFG.car_speed_ms) { S.lastCars = now; stepCars(now); }   // the city stays alive behind the menu
+    } else if (mode === "dying" && now > S.dieUntil) afterCaught(now);
+
+    const frozen = mode === "paused" || mode === "over";
+    // you
+    const p = S.player, pm = p.mesh;
+    pm.position.set(wx(p.x), 0, wz(p.y));
+    pm.rotation.y = p.ang;
+    pm.visible = !(mode === "play" && now < S.safeUntil && Math.floor(now / 130) % 2 === 0);
+    if (!frozen) animateHuman(pm, mode === "play" ? p.speedNow : 0, runSpeed(), dt);
+    // cars and police
+    for (const car of [...S.police, ...S.cars]) {
+      const [cx, cy] = renderPos(car, now);
+      car.mesh.position.set(wx(cx), 0, wz(cy));
+      car.mesh.rotation.y += angDiff(car.ang, car.mesh.rotation.y) * Math.min(1, dt * 12);
+    }
+    S.police.forEach((cop, i) => {
+      const on = Math.floor(now / 180 + i) % 2;
+      cop.mesh.userData.lights[0].material.color.set(on ? "#ff2030" : "#3a0008");
+      cop.mesh.userData.lights[1].material.color.set(on ? "#06103a" : "#2050ff");
+    });
+    S.poops.forEach((q, i) => { q.mesh.rotation.y += q.golden ? 0.05 : 0.02; q.mesh.position.y = Math.sin(now / 300 + i) * 0.02 + 0.01; });
+
+    if (mode === "menu") updateMenuCamera(now); else updateGameCamera(now, dt);
+    if (now > S.msgUntil) bannerEl.style.display = "none";
+    if (now > S.tipUntil) tipEl.style.display = "none";
+    if (mode !== "menu") drawRadar(now);
+  }
+  renderer.render(scene, camera);
+  requestAnimationFrame(loop);
+}
+
+// =========================================================
+//  START UP
+// =========================================================
+applyGraphics();
 requestAnimationFrame(loop);
+window.gameReady = true;
+document.getElementById("lmsg").textContent = "LOADING CHARACTER";
+loadHuman().then(g => {
+  HUMAN = g;
+  newGame();
+  document.getElementById("loading").classList.add("hidden");
+  showMain();
+});
 </script>
 </body>
 </html>

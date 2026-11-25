@@ -3,19 +3,21 @@
 **Live app:** [paste your Streamlit link here]
 
 ## What it does
-A silly 3D city game at sunset, played in **third person**: the camera follows behind your character as you walk freely around the city eating poop, upgrading your character, dodging traffic and escaping the police.
+A silly third-person 3D city game at sunset. Walk and run around a big city with skyscrapers, a park and a beach, eat poop to upgrade your character, stay on the sidewalk to avoid traffic, and escape the police when your wanted level goes up.
 
-| Character | Unlocks at | Speed |
-|---|---|---|
-| 🙂 Chan | start | normal |
-| 😎 Aj | 10 💩 | faster |
-| 🤠 TienChai | 25 💩 | even faster |
-| 👑 Tom Pearl | 50 💩 | fastest |
+It starts with a main menu (Play, Characters, Controls, Settings, Credits). Press Esc during the game for the pause menu.
 
-- 💩 = 1 point, golden 💩 = 3 points
+| Character | Unlocks at |
+|---|---|
+| Chan | start |
+| Aj | 10 💩 |
+| TienChai | 25 💩 |
+| Tom Pearl | 50 💩 |
+
+- 💩 = 1 point, golden 💩 = 3 points. Each character you unlock runs faster
 - **Wanted level ⭐:** every 8 points you get another star. Each star adds a police car 🚓, and the police get faster (up to 5 stars)
-- **Traffic 🚗:** normal cars drive around the city and can run you over. Stay on the sidewalk to be safe, and be careful crossing the street!
-- **Radar:** the round map in the corner turns with you and shows poop, police and cars
+- **Traffic 🚗:** cars drive around the city and can run you over. Stay on the sidewalk and be careful crossing the street!
+- **Radar:** the round map in the corner turns with the camera and shows poop and police
 - You have 3 lives
 
 **Who it's for:** anyone who wants a quick, funny game. All characters and places are fictional.
@@ -23,23 +25,31 @@ A silly 3D city game at sunset, played in **third person**: the camera follows b
 ## The AI
 The police cars use a **path-finding AI** called breadth-first search (BFS). Every step, it works out how many steps each street square is from you, then drives the police toward you along the shortest route. Extra police cars sometimes take a random turn so they spread out and can cut you off.
 
-## How to play
-- **Phone:** drag the joystick under the game. Up = walk forward, left/right = turn. Push it all the way to run.
-- **Computer:** click the game, then W/↑ = walk, S/↓ = back, A D/← → = turn, hold Shift to run.
-- Press 🎥 (or C) to switch between the third-person camera and the sky camera.
+## Controls
+- **Move:** W A S D or arrow keys. You walk the way the camera is facing
+- **Run:** hold Shift
+- **Look around:** hold the right mouse button and drag
+- **Zoom:** mouse wheel · **Camera behind you:** C · **Pause menu:** Esc or P
+- **Phone:** joystick under the game to walk (push all the way to run), drag on the game to look around
 
 ## Files
 - `app.py` – the Streamlit page and all the game settings (characters, wanted level, traffic, city map)
-- `game.html` – the game itself: 3D graphics (made with the free Three.js library), movement, traffic and the police AI
+- `game.html` – the game itself: 3D graphics (Three.js), menus, movement, camera, traffic and the police AI
 - `requirements.txt` – what Streamlit Cloud needs to install
+
+## Credits
+- 3D engine: [Three.js](https://threejs.org)
+- Person model: the "Soldier" model from the Three.js examples, with walk/run animations from Mixamo
+- Fonts: Bebas Neue and Oswald (Google Fonts)
 
 ## What it can't do (limitations)
 - The police chase you but don't plan ambushes on purpose.
 - You can't drive cars or go inside buildings.
-- The police and traffic still move square by square on the streets (only you walk freely).
+- The police and traffic move square by square along the streets (only you move freely).
+- It needs internet to load the 3D library and the person model. If the model can't load, a simple block person is used instead.
 - On a computer you must click the game before the keys work.
-- Your best score is only saved in your own browser.
-- It needs internet to load the 3D library, and older phones may run slowly.
+- Your best score and settings are only saved in your own browser.
+- Older phones may run slowly. Set Graphics to Low in Settings if that happens.
 - [Add anything else you found while testing.]
 
 ## Team
