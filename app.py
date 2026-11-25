@@ -10,46 +10,60 @@ import streamlit.components.v1 as components
 # speed_ms = how many milliseconds per step (smaller = faster)
 CHARACTERS = [
     {"name": "Chan",      "needs": 0,  "face": "🙂", "color": "#f4a261", "speed_ms": 220},
-    {"name": "Aj",        "needs": 10, "face": "😎", "color": "#2a9d8f", "speed_ms": 185},
-    {"name": "TienChai",  "needs": 25, "face": "🤠", "color": "#e76f51", "speed_ms": 150},
-    {"name": "Tom Pearl", "needs": 50, "face": "👑", "color": "#9b5de5", "speed_ms": 120},
+    {"name": "Aj",        "needs": 10, "face": "😎", "color": "#2a9d8f", "speed_ms": 190},
+    {"name": "TienChai",  "needs": 25, "face": "🤠", "color": "#e76f51", "speed_ms": 160},
+    {"name": "Tom Pearl", "needs": 50, "face": "👑", "color": "#9b5de5", "speed_ms": 130},
 ]
 
 LIVES = 3
-POOP_ON_MAP = 5            # how many poops are on the map at once
-POLICE_SPEED_MS = 300      # police step time at the start (smaller = faster)
-POLICE_MIN_SPEED_MS = 140  # police never get faster than this
-NEW_POLICE_EVERY = 15      # one more police officer every 15 poops
-MAX_POLICE = 4
-POLICE_RANDOMNESS = 0.25   # extra officers sometimes wander (0 = always chase)
+POOP_ON_MAP = 6            # how many poops are in the city at once
+GOLDEN_CHANCE = 0.12       # chance a new poop is golden (worth 3!)
 
-# The map: "#" is a wall, "." is open ground
+# Wanted level: one more star (and one more police car) every few poops
+POOP_PER_STAR = 8
+MAX_STARS = 5
+POLICE_SPEED_MS = 320      # police speed at 1 star (smaller = faster)
+POLICE_SPEED_STEP = 25     # police get this much faster per extra star
+POLICE_RANDOMNESS = 0.25   # extra police cars sometimes take a random turn
+
+TRAFFIC_CARS = 5           # normal cars driving around (they can run you over!)
+CAR_SPEED_MS = 260
+
+# The city map:
+#   "#" building   "." road   "g" park grass   "T" park tree   "P" palm tree
 MAP = [
-    "###################",
-    "#........#........#",
-    "#.##.###.#.###.##.#",
-    "#.................#",
-    "#.##.#.#####.#.##.#",
-    "#....#...#...#....#",
-    "#....###.#.###....#",
-    "#.##...........##.#",
-    "#.##.#.#####.#.##.#",
-    "#....#...#...#....#",
-    "#.##.###.#.###.##.#",
-    "#........#........#",
-    "###################",
+    "############################",
+    "#..........................#",
+    "#.P###.P###.####.#.##.P###.#",
+    "#.####.####.####.#.##.####.#",
+    "#.####.####.####.#.##.####.#",
+    "#.###P.###P.####.#.##.###P.#",
+    "#..........................#",
+    "#.P###.####.gggg.P###.####.#",
+    "#.####.####.gTgg.####......#",
+    "#.####.####.ggTg.####.####.#",
+    "#.###P.####.gggg.###P.####.#",
+    "#..........................#",
+    "#.#.##.P###.####.P###.P###.#",
+    "#.#.##......####.####.####.#",
+    "#.#.##.####.####.####.####.#",
+    "#.#.##.###P.####.###P.###P.#",
+    "#..........................#",
+    "############################",
 ]
+
+CITY_SEED = 7  # change this number to get different building colours and heights
 
 # =========================================================
 #  STREAMLIT PAGE
 # =========================================================
 
-st.set_page_config(page_title="Poop Run 3D", page_icon="💩", layout="centered")
-st.title("💩 Poop Run 3D")
+st.set_page_config(page_title="Poop Run: City", page_icon="💩", layout="centered")
+st.title("💩 Poop Run: City")
 st.write(
-    "Run around the map and eat as much poop as you can. "
-    "Eat enough and you upgrade to a faster character. "
-    "But watch out: the **AI police** 👮 are chasing you!"
+    "Sunset in the city. Run the streets, eat as much poop as you can and upgrade your character. "
+    "The more you eat, the higher your **wanted level** ⭐, and the more **police cars** 🚓 chase you. "
+    "Watch out for traffic too!"
 )
 
 st.subheader("Characters")
@@ -61,27 +75,33 @@ with st.expander("How to play"):
     st.markdown(
         "- **Computer:** click the game, then use the arrow keys or W A S D.\n"
         "- **Phone:** use the buttons under the game, or swipe on the map.\n"
-        "- Press 🎥 (or C) to switch between the chase camera and the bird's-eye view.\n"
-        "- Eat 💩 to score. You have 3 lives. If the police catch you, you lose one.\n"
+        "- Press 🎥 (or C) to switch between the street camera and the sky camera.\n"
+        "- 💩 = 1 point, golden 💩 = 3 points. You have 3 lives.\n"
+        "- Police cars catch you, traffic runs you over: both cost a life.\n"
+        "- The radar in the corner shows poop (brown/gold), police (flashing) and cars (grey).\n"
         "- The police use a path-finding AI (breadth-first search) to find the "
-        "shortest way to you. More police join as you eat more."
+        "shortest way to you through the streets."
     )
 
 config = {
     "characters": CHARACTERS,
     "lives": LIVES,
     "poop_on_map": POOP_ON_MAP,
+    "golden_chance": GOLDEN_CHANCE,
+    "poop_per_star": POOP_PER_STAR,
+    "max_stars": MAX_STARS,
     "police_speed_ms": POLICE_SPEED_MS,
-    "police_min_speed_ms": POLICE_MIN_SPEED_MS,
-    "new_police_every": NEW_POLICE_EVERY,
-    "max_police": MAX_POLICE,
+    "police_speed_step": POLICE_SPEED_STEP,
     "police_randomness": POLICE_RANDOMNESS,
+    "traffic_cars": TRAFFIC_CARS,
+    "car_speed_ms": CAR_SPEED_MS,
     "map": MAP,
+    "seed": CITY_SEED,
 }
 
 with open("game.html", "r", encoding="utf-8") as f:
     game_html = f.read().replace("__CONFIG__", json.dumps(config))
 
-components.html(game_html, height=680, scrolling=False)
+components.html(game_html, height=640, scrolling=False)
 
-st.caption("A silly school practice project. All characters are fictional.")
+st.caption("A silly school practice project. All characters and places are fictional.")

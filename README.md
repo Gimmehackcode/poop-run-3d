@@ -1,9 +1,9 @@
-# 💩 Poop Run 3D
+# 💩 Poop Run: City
 
 **Live app:** [paste your Streamlit link here]
 
 ## What it does
-A silly 3D maze game. You run around the map eating poop. Eat enough and your character upgrades:
+A silly 3D city game at sunset. Run the streets eating poop, upgrade your character, dodge traffic and escape the police.
 
 | Character | Unlocks at | Speed |
 |---|---|---|
@@ -12,28 +12,33 @@ A silly 3D maze game. You run around the map eating poop. Eat enough and your ch
 | 🤠 TienChai | 25 💩 | even faster |
 | 👑 Tom Pearl | 50 💩 | fastest |
 
-AI police 👮 chase you. You have 3 lives. Every 15 poops, another officer joins the chase (up to 4).
+- 💩 = 1 point, golden 💩 = 3 points
+- **Wanted level ⭐:** every 8 points you get another star. Each star adds a police car 🚓, and the police get faster (up to 5 stars)
+- **Traffic 🚗:** normal cars drive around the city and can run you over
+- **Radar:** the round map in the corner shows poop, police and cars
+- You have 3 lives
 
-**Who it's for:** anyone who wants a quick, funny game. All characters are fictional.
+**Who it's for:** anyone who wants a quick, funny game. All characters and places are fictional.
 
 ## The AI
-The police use a **path-finding AI** called breadth-first search (BFS). Every step, it works out how far each square of the map is from you, then moves the police to the square that gets closest. Extra officers sometimes wander randomly so they don't all follow the same path.
+The police cars use a **path-finding AI** called breadth-first search (BFS). Every step, it works out how many steps each street square is from you, then drives the police toward you along the shortest route. Extra police cars sometimes take a random turn so they spread out and can cut you off.
 
 ## How to play
 - **Computer:** click the game, then use the arrow keys or W A S D.
 - **Phone:** use the buttons under the game, or swipe on the map.
-- Press 🎥 (or C) to switch between the chase camera and the bird's-eye view.
+- Press 🎥 (or C) to switch between the street camera and the sky camera.
 
 ## Files
-- `app.py` – the Streamlit page and all the game settings (characters, speeds, map)
-- `game.html` – the game itself: 3D graphics (made with the free Three.js library), movement and the police AI
+- `app.py` – the Streamlit page and all the game settings (characters, wanted level, traffic, city map)
+- `game.html` – the game itself: 3D graphics (made with the free Three.js library), movement, traffic and the police AI
 - `requirements.txt` – what Streamlit Cloud needs to install
 
 ## What it can't do (limitations)
-- The police only chase. They don't plan ahead or trap you on purpose.
+- The police chase you but don't plan ambushes on purpose.
+- You walk in 4 directions on a grid. You can't steal cars or go inside buildings.
 - On a computer you must click the game before the keys work.
 - Your best score is only saved in your own browser.
-- It needs internet to load the 3D library, and very old phones may run it slowly.
+- It needs internet to load the 3D library, and older phones may run slowly.
 - [Add anything else you found while testing.]
 
 ## Team
