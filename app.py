@@ -73,7 +73,7 @@ MAP = [
     "wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww",
 ]
 
-START = [21, 16]   # where you start (column, row) - must be a road square
+START = [19, 15]   # where you start (column, row) - in the plaza, away from traffic
 CITY_SEED = 7      # change this number to get different buildings
 
 # =========================================================
