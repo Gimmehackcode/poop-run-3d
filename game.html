@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  body { margin: 0; font-family: system-ui, sans-serif; color: #222; background: transparent;
+         user-select: none; -webkit-user-select: none; touch-action: manipulation; }
+  #hud { display: flex; flex-wrap: wrap; gap: 6px 14px; justify-content: center;
+         font-size: 15px; margin: 4px 0 8px; }
+  #hud b { color: #6b3e1f; }
+  #wrap { max-width: 640px; margin: 0 auto; }
+  #stage { position: relative; width: 100%; border-radius: 12px; overflow: hidden;
+           box-shadow: 0 2px 10px rgba(0,0,0,.3); background: #87ceeb; touch-action: none; }
+  #stage canvas { display: block; width: 100%; height: 100%; }
+  #overlay { position: absolute; inset: 0; display: flex; flex-direction: column;
+             align-items: center; justify-content: center; text-align: center;
+             background: rgba(0,0,0,.55); color: white; cursor: pointer; padding: 10px; }
+  #overlay h2 { margin: 0 0 8px; font-size: 30px; }
+  #overlay p { margin: 0; font-size: 17px; }
+  #banner { position: absolute; left: 0; right: 0; top: 42%; text-align: center;
+            background: rgba(0,0,0,.65); color: #ffd166; font-weight: bold; font-size: 22px;
+            padding: 12px 6px; display: none; pointer-events: none; }
+  #pad { display: grid; grid-template-columns: 70px 70px 70px; grid-template-rows: 56px 56px;
+         gap: 6px; justify-content: center; margin-top: 10px; }
+  #pad button { font-size: 26px; border: none; border-radius: 12px; background: #8d5a2b;
+                color: white; cursor: pointer; }
+  #pad button:active { background: #5e3a1a; }
+  #up { grid-column: 2; grid-row: 1; }
+  #cam { grid-column: 3; grid-row: 1; font-size: 20px !important; background: #555 !important; }
+  #left { grid-column: 1; grid-row: 2; }
+  #down { grid-column: 2; grid-row: 2; }
+  #right { grid-column: 3; grid-row: 2; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div id="hud">
+    <span>Character: <b id="hChar"></b></span>
+    <span>💩 <b id="hScore">0</b></span>
+    <span id="hNext"></span>
+    <span id="hLives"></span>
+    <span>Best: <b id="hBest">0</b></span>
+  </div>
+  <div id="stage">
+    <div id="overlay"><h2 id="oTitle">💩 Poop Run 3D</h2><p id="oSub">Loading 3D world...</p></div>
+    <div id="banner"></div>
+  </div>
+  <div id="pad">
+    <button id="up">⬆️</button>
+    <button id="cam" title="Switch camera">🎥</button>
+    <button id="left">⬅️</button>
+    <button id="down">⬇️</button>
+    <button id="right">➡️</button>
+  </div>
+</div>
+
+<script>
+  // If the 3D library can't load (no internet / blocked), say so instead of a blank screen
+  setTimeout(() => {
+    if (!window.gameReady) {
+      document.getElementById("oSub").textContent =
+        "Couldn't load the 3D library. Check your internet connection and refresh.";
+    }
+  }, 10000);
+</script>
+
+<script type="module">
+import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js";
+
+const CFG = __CONFIG__;
+const MAP = CFG.map;
+const ROWS = MAP.length, COLS = MAP[0].length;
+
+const DIRS = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
+const SPAWNS = [[17, 11], [17, 1], [1, 11], [9, 7]];
+const PLAYER_START = [1, 1];
+
+const isWall = (x, y) => x < 0 || y < 0 || x >= COLS || y >= ROWS || MAP[y][x] === "#";
+const EMPTY = [];
+for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) if (!isWall(x, y)) EMPTY.push([x, y]);
+
+// Map tile (x, y) -> 3D world position (1 tile = 1 unit)
+const wx = x => x - COLS / 2 + 0.5;
+const wz = y => y - ROWS / 2 + 0.5;
+
+function loadBest() { try { return Number(localStorage.getItem("poopRunBest")) || 0; } catch (e) { return 0; } }
+function saveBest(v) { try { localStorage.setItem("poopRunBest", String(v)); } catch (e) {} }
+let best = loadBest();
+
+// =========================================================
+//  3D SCENE
+// =========================================================
+const stage = document.getElementById("stage");
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+stage.prepend(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color("#87ceeb");
+scene.fog = new THREE.Fog("#87ceeb", 18, 40);
+
+const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 100);
+let cameraMode = "follow"; // or "overview"
+
+function resize() {
+  const w = stage.clientWidth;
+  const h = Math.round(w * 0.68);
+  stage.style.height = h + "px";
+  renderer.setSize(w, h, false);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+}
+window.addEventListener("resize", resize);
+resize();
+
+// Lights
+scene.add(new THREE.HemisphereLight("#ffffff", "#5a7d3a", 0.9));
+const sun = new THREE.DirectionalLight("#fff6e0", 1.6);
+sun.position.set(-6, 14, 8);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+Object.assign(sun.shadow.camera, { left: -12, right: 12, top: 10, bottom: -10, near: 1, far: 40 });
+scene.add(sun);
+
+// Ground with a checkered grass pattern
+function grassTexture() {
+  const c = document.createElement("canvas");
+  c.width = COLS * 16; c.height = ROWS * 16;
+  const g = c.getContext("2d");
+  for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) {
+    g.fillStyle = (x + y) % 2 ? "#a8d672" : "#9bcc63";
+    g.fillRect(x * 16, y * 16, 16, 16);
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.magFilter = THREE.NearestFilter;
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+const ground = new THREE.Mesh(
+  new THREE.PlaneGeometry(COLS, ROWS),
+  new THREE.MeshStandardMaterial({ map: grassTexture() })
+);
+ground.rotation.x = -Math.PI / 2;
+ground.receiveShadow = true;
+scene.add(ground);
+
+const outer = new THREE.Mesh(
+  new THREE.PlaneGeometry(80, 80),
+  new THREE.MeshStandardMaterial({ color: "#6fa64a" })
+);
+outer.rotation.x = -Math.PI / 2;
+outer.position.y = -0.01;
+outer.receiveShadow = true;
+scene.add(outer);
+
+// Hedge walls
+const wallGeo = new THREE.BoxGeometry(1, 1, 1);
+const wallMat = new THREE.MeshStandardMaterial({ color: "#3f7a32", roughness: 0.9 });
+const wallTopGeo = new THREE.BoxGeometry(0.9, 0.12, 0.9);
+const wallTopMat = new THREE.MeshStandardMaterial({ color: "#5aa346", roughness: 0.9 });
+for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) {
+  if (MAP[y][x] !== "#") continue;
+  const box = new THREE.Mesh(wallGeo, wallMat);
+  box.position.set(wx(x), 0.5, wz(y));
+  box.castShadow = true; box.receiveShadow = true;
+  scene.add(box);
+  const top = new THREE.Mesh(wallTopGeo, wallTopMat);
+  top.position.set(wx(x), 1.06, wz(y));
+  scene.add(top);
+}
+
+// ---------- Helpers for emoji faces and name tags ----------
+function emojiSprite(emoji, scale) {
+  const c = document.createElement("canvas");
+  c.width = c.height = 128;
+  const g = c.getContext("2d");
+  g.font = "100px serif"; g.textAlign = "center"; g.textBaseline = "middle";
+  g.fillText(emoji, 64, 72);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true }));
+  s.scale.set(scale, scale, 1);
+  return s;
+}
+
+function nameTag(text) {
+  const c = document.createElement("canvas");
+  c.width = 256; c.height = 64;
+  const g = c.getContext("2d");
+  g.fillStyle = "rgba(0,0,0,.6)";
+  g.beginPath(); g.roundRect(8, 8, 240, 48, 20); g.fill();
+  g.fillStyle = "white"; g.font = "bold 30px system-ui";
+  g.textAlign = "center"; g.textBaseline = "middle";
+  g.fillText(text, 128, 33);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false }));
+  s.scale.set(1.2, 0.3, 1);
+  s.renderOrder = 10;
+  return s;
+}
+
+// ---------- 3D models ----------
+function makeCharacter(ch) {
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(
+    new THREE.CapsuleGeometry(0.26, 0.3, 6, 16),
+    new THREE.MeshStandardMaterial({ color: ch.color, roughness: 0.5 })
+  );
+  body.position.y = 0.45;
+  body.castShadow = true;
+  g.add(body);
+  const face = emojiSprite(ch.face, 0.6);
+  face.position.y = 1.0;
+  g.add(face);
+  const tag = nameTag(ch.name);
+  tag.position.y = 1.5;
+  g.add(tag);
+  g.userData.body = body;
+  return g;
+}
+
+function makePolice() {
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(
+    new THREE.CapsuleGeometry(0.26, 0.3, 6, 16),
+    new THREE.MeshStandardMaterial({ color: "#1d3f9e", roughness: 0.5 })
+  );
+  body.position.y = 0.45;
+  body.castShadow = true;
+  g.add(body);
+  const face = emojiSprite("👮", 0.6);
+  face.position.y = 1.0;
+  g.add(face);
+  const siren = new THREE.Mesh(
+    new THREE.SphereGeometry(0.09, 12, 12),
+    new THREE.MeshBasicMaterial({ color: "red" })
+  );
+  siren.position.y = 1.38;
+  g.add(siren);
+  g.userData.siren = siren;
+  g.userData.body = body;
+  return g;
+}
+
+const poopMat = new THREE.MeshStandardMaterial({ color: "#6b3e1f", roughness: 0.6 });
+const poopGeos = [
+  new THREE.TorusGeometry(0.2, 0.1, 10, 20),
+  new THREE.TorusGeometry(0.14, 0.085, 10, 20),
+  new THREE.TorusGeometry(0.08, 0.07, 10, 20),
+];
+const tipGeo = new THREE.ConeGeometry(0.07, 0.14, 12);
+function makePoop() {
+  const g = new THREE.Group();
+  poopGeos.forEach((geo, i) => {
+    const ring = new THREE.Mesh(geo, poopMat);
+    ring.rotation.x = Math.PI / 2;
+    ring.position.y = 0.1 + i * 0.14;
+    ring.castShadow = true;
+    g.add(ring);
+  });
+  const tip = new THREE.Mesh(tipGeo, poopMat);
+  tip.position.y = 0.5;
+  g.add(tip);
+  // little eyes
+  const eyeMat = new THREE.MeshBasicMaterial({ color: "white" });
+  const pupilMat = new THREE.MeshBasicMaterial({ color: "black" });
+  [-0.08, 0.08].forEach(x => {
+    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.045, 8, 8), eyeMat);
+    eye.position.set(x, 0.26, 0.2);
+    const pupil = new THREE.Mesh(new THREE.SphereGeometry(0.022, 8, 8), pupilMat);
+    pupil.position.set(x, 0.26, 0.24);
+    g.add(eye, pupil);
+  });
+  return g;
+}
+
+// =========================================================
+//  GAME LOGIC
+// =========================================================
+let S;
+
+function characterIndex(eaten) {
+  let idx = 0;
+  CFG.characters.forEach((c, i) => { if (eaten >= c.needs) idx = i; });
+  return idx;
+}
+
+function placeAt(e, x, y) { e.x = e.fx = x; e.y = e.fy = y; e.t0 = 0; e.dur = 1; }
+function moveTo(e, x, y, now, dur) { e.fx = e.x; e.fy = e.y; e.x = x; e.y = y; e.t0 = now; e.dur = dur; }
+function renderPos(e, now) {
+  const k = Math.min(1, (now - e.t0) / e.dur);
+  return [e.fx + (e.x - e.fx) * k, e.fy + (e.y - e.fy) * k, k];
+}
+
+function setPlayerModel() {
+  if (S.player.mesh) scene.remove(S.player.mesh);
+  S.player.mesh = makeCharacter(CFG.characters[S.charIdx]);
+  scene.add(S.player.mesh);
+}
+
+function newGame() {
+  if (S) {
+    S.police.forEach(c => scene.remove(c.mesh));
+    S.poops.forEach(p => scene.remove(p.mesh));
+  }
+  S = {
+    player: { dir: null, next: null, mesh: S ? S.player.mesh : null },
+    police: [], poops: [], eaten: 0, lives: CFG.lives,
+    started: false, over: false, msgUntil: 0, safeUntil: 0, popUntil: 0,
+    lastPlayer: 0, lastPolice: 0, charIdx: 0,
+  };
+  placeAt(S.player, PLAYER_START[0], PLAYER_START[1]);
+  setPlayerModel();
+  addPolice();
+  fillPoop();
+  updateHud();
+}
+
+function wantedPolice() {
+  return Math.min(CFG.max_police, 1 + Math.floor(S.eaten / CFG.new_police_every));
+}
+
+function addPolice() {
+  while (S.police.length < wantedPolice()) {
+    const s = SPAWNS[S.police.length % SPAWNS.length];
+    const cop = { sx: s[0], sy: s[1], mesh: makePolice() };
+    placeAt(cop, s[0], s[1]);
+    scene.add(cop.mesh);
+    S.police.push(cop);
+  }
+}
+
+function fillPoop() {
+  let tries = 0;
+  while (S.poops.length < CFG.poop_on_map && tries < 500) {
+    tries++;
+    const [x, y] = EMPTY[Math.floor(Math.random() * EMPTY.length)];
+    const far = Math.abs(x - S.player.x) + Math.abs(y - S.player.y) > 3;
+    const free = !S.poops.some(p => p.x === x && p.y === y);
+    if (far && free) {
+      const mesh = makePoop();
+      mesh.position.set(wx(x), 0, wz(y));
+      mesh.rotation.y = Math.random() * Math.PI * 2;
+      scene.add(mesh);
+      S.poops.push({ x, y, mesh });
+    }
+  }
+}
+
+const bannerEl = document.getElementById("banner");
+function showMsg(text, now, ms = 1500) {
+  bannerEl.textContent = text;
+  bannerEl.style.display = "block";
+  S.msgUntil = now + ms;
+}
+
+// ---------- Player ----------
+function stepPlayer(now) {
+  const p = S.player;
+  const speed = CFG.characters[S.charIdx].speed_ms;
+  if (p.next) {
+    const [dx, dy] = DIRS[p.next];
+    if (!isWall(p.x + dx, p.y + dy)) p.dir = p.next;
+  }
+  if (!p.dir) return;
+  const [dx, dy] = DIRS[p.dir];
+  if (isWall(p.x + dx, p.y + dy)) return;
+  moveTo(p, p.x + dx, p.y + dy, now, speed);
+
+  const i = S.poops.findIndex(q => q.x === p.x && q.y === p.y);
+  if (i >= 0) {
+    scene.remove(S.poops[i].mesh);
+    S.poops.splice(i, 1);
+    S.eaten++;
+    const newIdx = characterIndex(S.eaten);
+    if (newIdx > S.charIdx) {
+      S.charIdx = newIdx;
+      setPlayerModel();
+      S.popUntil = now + 600;
+      showMsg("UPGRADE! You are now " + CFG.characters[newIdx].name + "!", now, 2200);
+    }
+    const before = S.police.length;
+    addPolice();
+    if (S.police.length > before && S.msgUntil < now) showMsg("🚨 More police are coming!", now);
+    fillPoop();
+    updateHud();
+  }
+  checkCaught(now);
+}
+
+// ---------- Police AI (breadth-first search) ----------
+function distanceMap() {
+  const dist = Array.from({ length: ROWS }, () => Array(COLS).fill(Infinity));
+  const queue = [[S.player.x, S.player.y]];
+  dist[S.player.y][S.player.x] = 0;
+  while (queue.length) {
+    const [x, y] = queue.shift();
+    for (const [dx, dy] of Object.values(DIRS)) {
+      const nx = x + dx, ny = y + dy;
+      if (!isWall(nx, ny) && dist[ny][nx] === Infinity) {
+        dist[ny][nx] = dist[y][x] + 1;
+        queue.push([nx, ny]);
+      }
+    }
+  }
+  return dist;
+}
+
+function stepPolice(now, policeMs) {
+  const dist = distanceMap();
+  S.police.forEach((cop, i) => {
+    const options = Object.values(DIRS)
+      .map(([dx, dy]) => [cop.x + dx, cop.y + dy])
+      .filter(([x, y]) => !isWall(x, y) && !S.police.some(o => o !== cop && o.x === x && o.y === y));
+    if (!options.length) return;
+    let choice;
+    if (i > 0 && Math.random() < CFG.police_randomness) {
+      choice = options[Math.floor(Math.random() * options.length)];
+    } else {
+      choice = options.reduce((a, b) => (dist[b[1]][b[0]] < dist[a[1]][a[0]] ? b : a));
+    }
+    moveTo(cop, choice[0], choice[1], now, policeMs);
+  });
+  checkCaught(now);
+}
+
+function checkCaught(now) {
+  if (now < S.safeUntil || S.over) return;
+  if (!S.police.some(c => c.x === S.player.x && c.y === S.player.y)) return;
+  S.lives--;
+  updateHud();
+  if (S.lives <= 0) {
+    S.over = true;
+    if (S.eaten > best) { best = S.eaten; saveBest(best); updateHud(); }
+    showOverlay("Game over! You ate " + S.eaten + " 💩", "Tap or press Space to play again");
+    return;
+  }
+  placeAt(S.player, PLAYER_START[0], PLAYER_START[1]);
+  S.player.dir = null; S.player.next = null;
+  S.police.forEach(c => placeAt(c, c.sx, c.sy));
+  S.safeUntil = now + 1500;
+  showMsg("🚔 Caught! " + S.lives + " lives left", now);
+}
+
+// ---------- HUD and overlay ----------
+const overlayEl = document.getElementById("overlay");
+function showOverlay(title, sub) {
+  document.getElementById("oTitle").textContent = title;
+  document.getElementById("oSub").textContent = sub;
+  overlayEl.style.display = "flex";
+}
+
+function updateHud() {
+  const ch = CFG.characters[S.charIdx];
+  document.getElementById("hChar").textContent = ch.face + " " + ch.name;
+  document.getElementById("hScore").textContent = S.eaten;
+  const nextC = CFG.characters[S.charIdx + 1];
+  document.getElementById("hNext").textContent =
+    nextC ? "Next: " + nextC.name + " in " + (nextC.needs - S.eaten) : "MAX LEVEL!";
+  document.getElementById("hLives").textContent = "❤️".repeat(Math.max(0, S.lives));
+  document.getElementById("hBest").textContent = best;
+}
+
+// =========================================================
+//  GAME LOOP (logic + drawing)
+// =========================================================
+const camTarget = new THREE.Vector3();
+const camPos = new THREE.Vector3(0, 16, 11);
+
+function loop(now) {
+  if (S.started && !S.over) {
+    const playerMs = CFG.characters[S.charIdx].speed_ms;
+    const policeMs = Math.max(CFG.police_min_speed_ms, CFG.police_speed_ms - S.eaten * 2);
+    if (now - S.lastPlayer >= playerMs) { S.lastPlayer = now; stepPlayer(now); }
+    if (now - S.lastPolice >= policeMs) { S.lastPolice = now; stepPolice(now, policeMs); }
+  }
+  if (now > S.msgUntil) bannerEl.style.display = "none";
+
+  // Player
+  const [px, py, pk] = renderPos(S.player, now);
+  const pm = S.player.mesh;
+  pm.position.set(wx(px), 0, wz(py));
+  const moving = pk < 1;
+  pm.userData.body.position.y = 0.45 + (moving ? Math.abs(Math.sin(now / 70)) * 0.08 : 0);
+  pm.visible = !(now < S.safeUntil && Math.floor(now / 120) % 2 === 0);
+  const pop = now < S.popUntil ? 1 + Math.sin(((S.popUntil - now) / 600) * Math.PI) * 0.5 : 1;
+  pm.scale.setScalar(pop);
+
+  // Police
+  S.police.forEach((cop, i) => {
+    const [cx, cy, ck] = renderPos(cop, now);
+    cop.mesh.position.set(wx(cx), 0, wz(cy));
+    cop.mesh.userData.body.position.y = 0.45 + (ck < 1 ? Math.abs(Math.sin(now / 80 + i)) * 0.06 : 0);
+    cop.mesh.userData.siren.material.color.set(Math.floor(now / 250 + i) % 2 ? "red" : "#2a6bff");
+  });
+
+  // Poop spins and bobs
+  S.poops.forEach((p, i) => {
+    p.mesh.rotation.y += 0.02;
+    p.mesh.position.y = Math.sin(now / 300 + i) * 0.05 + 0.03;
+  });
+
+  // Camera
+  if (cameraMode === "follow") {
+    camTarget.set(wx(px), 0, wz(py));
+    camPos.lerp(new THREE.Vector3(wx(px), 6.5, wz(py) + 5.5), 0.08);
+  } else {
+    camTarget.set(0, 0, 0.5);
+    camPos.lerp(new THREE.Vector3(0, 16, 10.5), 0.08);
+  }
+  camera.position.copy(camPos);
+  camera.lookAt(camTarget);
+
+  renderer.render(scene, camera);
+  requestAnimationFrame(loop);
+}
+
+// =========================================================
+//  CONTROLS
+// =========================================================
+function press(dir) {
+  if (S.over) newGame();
+  if (!S.started) {
+    S.started = true;
+    S.safeUntil = performance.now() + 1000;
+    overlayEl.style.display = "none";
+  }
+  if (dir) S.player.next = dir;
+}
+
+const KEYS = { ArrowUp: "up", ArrowDown: "down", ArrowLeft: "left", ArrowRight: "right",
+               w: "up", s: "down", a: "left", d: "right", W: "up", S: "down", A: "left", D: "right" };
+document.addEventListener("keydown", e => {
+  if (KEYS[e.key]) { e.preventDefault(); press(KEYS[e.key]); }
+  else if (e.key === " " || e.key === "Enter") { e.preventDefault(); press(null); }
+  else if (e.key === "c" || e.key === "C") toggleCamera();
+});
+
+["up", "down", "left", "right"].forEach(d => {
+  document.getElementById(d).addEventListener("pointerdown", e => { e.preventDefault(); press(d); });
+});
+
+function toggleCamera() { cameraMode = cameraMode === "follow" ? "overview" : "follow"; }
+document.getElementById("cam").addEventListener("pointerdown", e => { e.preventDefault(); toggleCamera(); });
+
+let touchStart = null;
+stage.addEventListener("touchstart", e => { touchStart = e.touches[0]; e.preventDefault(); }, { passive: false });
+stage.addEventListener("touchend", e => {
+  if (!touchStart) return;
+  const t = e.changedTouches[0];
+  const dx = t.clientX - touchStart.clientX, dy = t.clientY - touchStart.clientY;
+  touchStart = null;
+  if (Math.max(Math.abs(dx), Math.abs(dy)) < 20) { press(null); return; }
+  press(Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? "right" : "left") : (dy > 0 ? "down" : "up"));
+}, { passive: false });
+stage.addEventListener("mousedown", () => press(null));
+
+newGame();
+window.gameReady = true;
+showOverlay("💩 Poop Run 3D", "Tap or press any arrow to start");
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
