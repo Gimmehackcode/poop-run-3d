@@ -7,6 +7,8 @@ A silly third-person 3D city game at sunset. Walk and run around a big city with
 
 It starts with a main menu (Play, Characters, Controls, Settings, Credits). Press Esc during the game for the pause menu.
 
+The box in the top-left corner shows your current rank picture and how close you are to the next rank. When you rank up, a big pop-up in the middle of the screen says "Congratulations! You've ranked up to ...".
+
 | Character | Unlocks at |
 |---|---|
 | Chan | start |
@@ -36,6 +38,7 @@ The police officers use a **path-finding AI** called breadth-first search (BFS).
 - `app.py` – the Streamlit page and all the game settings (characters, wanted level, traffic, city map)
 - `game.html` – the game itself: 3D graphics (Three.js), menus, movement, camera, traffic and the police AI
 - `requirements.txt` – what Streamlit Cloud needs to install
+- `rank-chan.jpg`, `rank-aj.jpg`, `rank-tienchai.jpg`, `rank-tompearl.jpg` – the rank pictures (AI-generated). Swap them for your own pictures with the same names
 
 ## Credits
 - 3D engine: [Three.js](https://threejs.org)

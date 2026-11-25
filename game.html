@@ -31,7 +31,25 @@
   #lives { font-size: 18px; }
   #who { font-family: var(--title); font-size: 21px; margin-top: 4px; }
   #who small { display: block; font-family: var(--ui); font-size: 13px; opacity: .9; }
-  #tip { position: absolute; top: 14px; left: 14px; max-width: 300px; background: rgba(0,0,0,.72);
+  /* rank box (top left) and the big rank-up pop-up */
+  #rank { position: absolute; top: 14px; left: 14px; width: 116px; background: rgba(0,0,0,.6); border: 2px solid rgba(255,255,255,.85);
+          border-radius: 6px; padding: 6px; box-sizing: border-box; text-align: center; }
+  #rank .pic { width: 100px; height: 100px; border-radius: 4px; background: #333 center / cover no-repeat; }
+  #rank .name { font-family: var(--title); font-size: 21px; margin-top: 5px; line-height: 1; }
+  #rank .lvl { font-size: 11px; opacity: .85; }
+  #rank .bar { height: 5px; background: rgba(255,255,255,.2); border-radius: 3px; margin-top: 4px; overflow: hidden; }
+  #rank .bar i { display: block; height: 100%; width: 0; background: #ffd23f; transition: width .3s; }
+  #rankup { position: absolute; inset: 0; display: none; flex-direction: column; align-items: center; justify-content: center; text-align: center;
+            background: radial-gradient(circle, rgba(0,0,0,.6), rgba(0,0,0,.15) 65%); }
+  #rankup.show { display: flex; animation: rfade 3.4s forwards; }
+  #rankup .pic { width: min(240px, 38vh); height: min(240px, 38vh); border-radius: 10px; border: 4px solid #ffd23f; background: #333 center / cover no-repeat;
+                 box-shadow: 0 0 40px rgba(255,210,63,.8); animation: rpop .55s cubic-bezier(.2,1.6,.4,1); }
+  #rankup .t1 { font-family: var(--title); font-size: 52px; color: #ffd23f; margin-top: 16px; letter-spacing: 2px; line-height: 1; }
+  #rankup .t2 { font-size: 24px; margin-top: 4px; }
+  @keyframes rpop { from { transform: scale(.2) rotate(-12deg); } to { transform: scale(1) rotate(0); } }
+  @keyframes rfade { 0%, 85% { opacity: 1; } 100% { opacity: 0; } }
+  .thumb { display: inline-block; width: 30px; height: 30px; border-radius: 3px; background: #333 center / cover no-repeat; vertical-align: middle; margin-right: 8px; }
+  #tip { position: absolute; top: 172px; left: 14px; max-width: 300px; background: rgba(0,0,0,.72);
          padding: 10px 12px; font-size: 14px; line-height: 1.4; border-radius: 3px; display: none; }
   #radar { position: absolute; left: 16px; bottom: 16px; width: 150px; height: 150px; border-radius: 50%;
            border: 3px solid rgba(0,0,0,.85); box-shadow: 0 0 0 2px rgba(255,255,255,.35); background: #222; }
@@ -103,6 +121,8 @@
   <div id="stage">
     <div id="hud" class="hidden">
       <div id="tip" class="shadowtxt"></div>
+      <div id="rank" class="shadowtxt"><div class="pic" id="rankPic"></div><div class="name" id="rankName"></div><div class="lvl" id="rankLvl"></div><div class="bar"><i id="rankBar"></i></div></div>
+      <div id="rankup" class="shadowtxt"><div class="pic" id="rankupPic"></div><div class="t1">CONGRATULATIONS!</div><div class="t2" id="rankupText"></div></div>
       <div id="topbtns"><button class="ibtn fsbtn" title="Full screen (F)">⛶</button><button class="ibtn" id="pauseBtn" title="Menu (Esc)">❚❚</button></div>
       <div id="hudR" class="shadowtxt">
         <div id="stars"></div>
@@ -1239,6 +1259,17 @@ const bannerEl = document.getElementById("banner");
 function showMsg(html, now, ms = 1800, color = "white") { bannerEl.innerHTML = html; bannerEl.style.color = color; bannerEl.style.display = "block"; S.msgUntil = now + ms; }
 const tipEl = document.getElementById("tip");
 function showTip(html, now, ms = 7000) { tipEl.innerHTML = html; tipEl.style.display = "block"; S.tipUntil = now + ms; }
+const picUrl = ch => (ch.image ? 'url("' + ch.image + '")' : "none");
+// Big pop-up in the middle of the screen when you rank up
+const rankupEl = document.getElementById("rankup");
+function showRankUp(i) {
+  const ch = CFG.characters[i];
+  document.getElementById("rankupPic").style.backgroundImage = picUrl(ch);
+  document.getElementById("rankupText").textContent = "You've ranked up to " + ch.name;
+  rankupEl.classList.remove("show"); void rankupEl.offsetWidth; rankupEl.classList.add("show");
+  clearTimeout(rankupEl.hideTimer);
+  rankupEl.hideTimer = setTimeout(() => rankupEl.classList.remove("show"), 3500);
+}
 
 // ---------- Input ----------
 const keys = {};
@@ -1284,7 +1315,7 @@ function eatPoop(i, now) {
   if (newIdx > S.charIdx) {
     S.charIdx = newIdx;
     const ang = S.player.ang; setPlayerModel(); S.player.ang = ang;
-    showMsg("UPGRADED<small>You are now " + CFG.characters[newIdx].name + "</small>", now, 2600, "#ffd23f");
+    showRankUp(newIdx);
   } else if (S.stars > oldStars) showMsg("WANTED LEVEL " + S.stars + "<small>Another officer is after you</small>", now, 2000, "#ffd23f");
   else if (poop.golden) showMsg("+3<small>Golden poop!</small>", now, 1200, "#ffd23f");
   if (S.stars > oldStars) flashStars();
@@ -1437,6 +1468,11 @@ function updateHud() {
   let stars = "";
   for (let i = 1; i <= CFG.max_stars; i++) stars += i <= S.stars ? "★" : '<span class="off">★</span>';
   starsEl.innerHTML = stars;
+  // rank box: picture, name, rank number and progress to the next rank
+  document.getElementById("rankPic").style.backgroundImage = picUrl(ch);
+  document.getElementById("rankName").textContent = ch.name;
+  document.getElementById("rankLvl").textContent = "Rank " + (S.charIdx + 1) + " / " + CFG.characters.length;
+  document.getElementById("rankBar").style.width = (nextC ? Math.min(100, (S.eaten - ch.needs) / (nextC.needs - ch.needs) * 100) : 100) + "%";
 }
 const RT = 8;
 const radarMap = makeCanvas(COLS * RT, ROWS * RT);
@@ -1551,7 +1587,8 @@ function panelDef(id) {
   } });
   switch (id) {
     case "characters": return { title: "CHARACTERS", rows: CFG.characters.map((c, i) =>
-      info('<span style="color:' + c.color + '">■</span> ' + c.name, i === 0 ? "You start as " + c.name : "Eat " + c.needs + " 💩")),
+      info((c.image ? '<span class="thumb" style="background-image:url(&quot;' + c.image + '&quot;)"></span>' : '<span style="color:' + c.color + '">■</span> ') + c.name,
+           i === 0 ? "Rank 1 - you start here" : "Rank " + (i + 1) + " - eat " + c.needs + " 💩")),
       desc: "Every character you unlock runs faster than the one before. Golden poop is worth 3." };
     case "controls": return { title: "CONTROLS", rows: [
       info("Move", "W A S D / arrow keys"), info("Run", "Hold Shift"), info("Look around", "Hold right mouse button + drag"),

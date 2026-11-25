@@ -1,4 +1,6 @@
+import base64
 import json
+import os
 import streamlit as st
 import streamlit.components.v1 as components
 
@@ -6,13 +8,14 @@ import streamlit.components.v1 as components
 #  GAME SETTINGS  (change these to tweak the game!)
 # =========================================================
 
-# Characters unlock when you've eaten "needs" poops.
+# Ranks: you unlock the next one when you've eaten "needs" poops.
 # speed_ms = milliseconds to RUN one map square (smaller = faster). Walking is slower.
+# image = the picture shown in the rank box (put the file next to app.py)
 CHARACTERS = [
-    {"name": "Chan",      "needs": 0,  "color": "#f4a261", "speed_ms": 600},
-    {"name": "Aj",        "needs": 10, "color": "#2a9d8f", "speed_ms": 540},
-    {"name": "TienChai",  "needs": 25, "color": "#e76f51", "speed_ms": 480},
-    {"name": "Tom Pearl", "needs": 50, "color": "#ffd23f", "speed_ms": 420},
+    {"name": "Chan",      "needs": 0,  "color": "#f4a261", "speed_ms": 600, "image": "rank-chan.jpg"},
+    {"name": "Aj",        "needs": 10, "color": "#2a9d8f", "speed_ms": 540, "image": "rank-aj.jpg"},
+    {"name": "TienChai",  "needs": 25, "color": "#e76f51", "speed_ms": 480, "image": "rank-tienchai.jpg"},
+    {"name": "Tom Pearl", "needs": 50, "color": "#ffd23f", "speed_ms": 420, "image": "rank-tompearl.jpg"},
 ]
 
 LIVES = 3
@@ -83,8 +86,19 @@ CITY_SEED = 7      # change this number to get different buildings
 st.set_page_config(page_title="Poop Run: City", page_icon="💩", layout="wide")
 st.markdown("### 💩 Poop Run: City")
 
+def picture(path):
+    """Turn a picture file into text the game can show (or None if the file is missing)."""
+    if not path or not os.path.exists(path):
+        return None
+    kind = "png" if path.lower().endswith(".png") else "jpeg"
+    with open(path, "rb") as f:
+        return "data:image/" + kind + ";base64," + base64.b64encode(f.read()).decode()
+
+
+characters = [{**c, "image": picture(c.get("image"))} for c in CHARACTERS]
+
 config = {
-    "characters": CHARACTERS,
+    "characters": characters,
     "lives": LIVES,
     "poop_on_map": POOP_ON_MAP,
     "golden_chance": GOLDEN_CHANCE,
