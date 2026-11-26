@@ -7,7 +7,9 @@ A silly third-person 3D city game at sunset. Walk and run around a big city with
 
 It starts with a main menu (Play, Characters, Controls, Settings, Credits). Press Esc during the game for the pause menu.
 
-The box in the top-left corner shows your current rank picture and how close you are to the next rank. When you rank up, a big pop-up in the middle of the screen says "Congratulations! You've ranked up to ...".
+The box in the top-left corner shows your current rank picture and how close you are to the next rank. When you rank up, a big pop-up in the middle of the screen says "Congratulations! You've ranked up to ...". Your rank picture is also your character's face.
+
+The police are patrol officers in blue uniforms and caps. From 3 wanted stars, SWAT officers join the chase.
 
 Cars drive in their lanes, stop at traffic lights and brake (and honk!) if you stand in front of them - but they can't stop instantly. When you eat a poop, your character nibbles it like a hamster with puffed-up cheeks, and you can keep running while you eat.
 
@@ -44,13 +46,15 @@ The police officers use a **path-finding AI** called breadth-first search (BFS).
 
 ## Credits
 - 3D engine: [Three.js](https://threejs.org)
-- People: the "Soldier" (you and the police) and "X Bot" (pedestrians) models from the Three.js examples, with animations from Mixamo
+- People: the "Soldier" (you) and "X Bot" (pedestrians) models from the Three.js examples, with animations from Mixamo
+- Patrol officer (`models/police-officer.glb`): made with MakeHuman from its CC0 assets, with animations from Quaternius' Universal Animation Library (CC0), as packaged in the police-command project
+- SWAT officer (`models/police-swat.gltf`): "SWAT" by Quaternius (CC0)
 - Fonts: Bebas Neue and Oswald (Google Fonts)
 
 ## What it can't do (limitations)
 - The police chase you but don't plan ambushes on purpose.
 - You can't drive cars or go inside buildings.
-- Traffic moves square by square along the streets. Pedestrians just walk around their block.
+- Pedestrians just walk around their block and don't cross the road.
 - It needs internet to load the 3D library and the people models. If a model can't load, a simple block person is used instead.
 - Full screen doesn't work on iPhones (Apple doesn't allow it for web pages).
 - On a computer you must click the game before the keys work.
