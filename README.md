@@ -11,6 +11,8 @@ The box in the top-left corner shows your current rank picture and how close you
 
 You, the police and the people walking around are realistic 3D people. Your shirt changes colour with your rank. The police are male and female patrol officers in blue uniforms and caps. From 3 wanted stars, SWAT officers join the chase.
 
+**The police AI learns from you.** Every time you go through a junction, it records whether you went straight, left, right or back, and remembers your habits between games (in your browser). It uses them to predict where you're heading: one officer chases you, the others run ahead along your predicted route to cut you off. The panel under your score shows what it has learned, and red dots on the minimap show where it thinks you'll go.
+
 Cars drive in their lanes, stop at traffic lights and brake (and honk!) if you stand in front of them - but they can't stop instantly. When you eat a poop, your character nibbles it like a hamster with puffed-up cheeks, and you can keep running while you eat.
 
 | Character | Unlocks at |
@@ -55,6 +57,7 @@ The police officers use a **path-finding AI** called breadth-first search (BFS).
 - The police chase you but don't plan ambushes on purpose.
 - You can't drive cars or go inside buildings.
 - Pedestrians just walk around their block and don't cross the road.
+- The police memory is saved in your browser. Clear the site data to make them forget you.
 - It needs internet to load the 3D library and the people models. If a model can't load, a simple block person is used instead.
 - Full screen doesn't work on iPhones (Apple doesn't allow it for web pages).
 - On a computer you must click the game before the keys work.

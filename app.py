@@ -19,14 +19,14 @@ CHARACTERS = [
 ]
 
 LIVES = 3
-POOP_ON_MAP = 14           # how many poops are in the city at once
-GOLDEN_CHANCE = 0.12       # chance a new poop is golden (worth 3!)
+POOP_ON_MAP = 24           # how many poops are in the city at once
+GOLDEN_CHANCE = 0.15       # chance a new poop is golden (worth 3!)
 
 # Wanted level: one more police officer every few points
 POOP_PER_STAR = 8
 MAX_STARS = 5
-POLICE_SPEED_MS = 820      # how fast the police run at 1 star (smaller = faster)
-POLICE_SPEED_STEP = 60     # police get this much faster per extra star
+POLICE_SPEED_MS = 760      # how fast the police run at 1 star (smaller = faster)
+POLICE_SPEED_STEP = 65     # police get this much faster per extra star
 POLICE_RANDOMNESS = 0.25   # extra officers sometimes take a different street
 
 TRAFFIC_CARS = 16          # cars driving around (they can run you over!)

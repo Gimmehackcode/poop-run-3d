@@ -31,6 +31,8 @@
   #lives { font-size: 18px; }
   #who { font-family: var(--title); font-size: 21px; margin-top: 4px; }
   #who small { display: block; font-family: var(--ui); font-size: 13px; opacity: .9; }
+  #aiinfo { font-size: 12px; margin-top: 6px; opacity: .95; max-width: 230px; margin-left: auto; line-height: 1.3; }
+  #aiinfo b { color: #ff6b6b; }
   /* rank box (top left) and the big rank-up pop-up */
   #rank { position: absolute; top: 14px; left: 14px; width: 116px; background: rgba(0,0,0,.6); border: 2px solid rgba(255,255,255,.85);
           border-radius: 6px; padding: 6px; box-sizing: border-box; text-align: center; }
@@ -129,6 +131,7 @@
         <div id="score">💩 0</div>
         <div id="lives"></div>
         <div id="who"></div>
+        <div id="aiinfo"></div>
       </div>
       <canvas id="radar" width="300" height="300"></canvas>
       <div id="banner" class="shadowtxt"></div>
@@ -565,7 +568,7 @@ function flushMerged() {
 // =========================================================
 //  FACADE TEXTURES (each texture = 4 window bays wide x 4 floors tall)
 // =========================================================
-const FLOOR_H = 0.55, SHOP_H = 0.62, SIDEWALK = 0.36;
+const FLOOR_H = 0.55, SHOP_H = 0.62, SIDEWALK = 0.47;   // sidewalk width (1 = one map square)
 const MOD = Math.round(256 * TEX);   // pixels per bay
 function facade(style, palette, seed) {
   const W = MOD * 4, H = Math.round(MOD * 0.5) * 4, bh = H / 4, bw = MOD;
@@ -709,9 +712,11 @@ for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) {
   for (let yy = y; yy < y + h; yy++) for (let xx = x; xx < x + w; xx++) used[yy][xx] = true;
   const open = list => list.some(([xx, yy]) => inside(xx, yy) && !isB(xx, yy));
   const side = (n, f) => Array.from({ length: n }, (_, i) => f(i));
-  RECTS.push({ x, y, w, h,
-    iL: open(side(h, i => [x - 1, y + i])) ? SIDEWALK : 0, iR: open(side(h, i => [x + w, y + i])) ? SIDEWALK : 0,
-    iT: open(side(w, i => [x + i, y - 1])) ? SIDEWALK : 0, iB: open(side(w, i => [x + i, y + h])) ? SIDEWALK : 0 });
+  // sidewalk on each open side; on very narrow blocks they get a bit thinner so there's still a building in the middle
+  const walk = (a, b, len) => { const each = Math.min(SIDEWALK, (len - 0.34) / (a && b ? 2 : 1)); return [a ? each : 0, b ? each : 0]; };
+  const [iL, iR] = walk(open(side(h, i => [x - 1, y + i])), open(side(h, i => [x + w, y + i])), w);
+  const [iT, iB] = walk(open(side(w, i => [x + i, y - 1])), open(side(w, i => [x + i, y + h])), h);
+  RECTS.push({ x, y, w, h, iL, iR, iT, iB });
 }
 // 2) split big rectangles into separate buildings (very big blocks stay as one: malls, office parks)
 const PIECES = [];
@@ -854,19 +859,118 @@ function umbrella(x, y) {
   addObstacle(x, y, 0.08);
 }
 
+// sidewalk furniture. Lamps, palms, hydrants and bins stand right at the curb, bus stops and planters against
+// the buildings - so the middle of the (wide) sidewalk is always free to walk on.
+const hydrantMat = new THREE.MeshStandardMaterial({ color: "#c8261e", roughness: 0.5, metalness: 0.2 });
+const binMat = new THREE.MeshStandardMaterial({ color: "#2f5a3a", roughness: 0.7, metalness: 0.2 });
+const newsMat = new THREE.MeshStandardMaterial({ color: "#2457b3", roughness: 0.5, metalness: 0.2 });
+const shelterGlass = new THREE.MeshStandardMaterial({ color: "#a9cfe0", roughness: 0.08, metalness: 0.1, transparent: true, opacity: 0.35 });
+shelterGlass.userData.noShadow = true;
+const flowerMats = ["#e0457b", "#f2c230", "#e8693a", "#b45fd6"].map(c => new THREE.MeshStandardMaterial({ color: c, roughness: 0.8 }));
+const CURB = 0.06;              // how far from the road edge the curb furniture stands
+function hydrant(x, y) {
+  const m = mat4(wx(x), 0, wz(y));
+  addGeo(new THREE.CylinderGeometry(0.016, 0.02, 0.07, 8).translate(0, 0.035, 0), hydrantMat, m);
+  addGeo(new THREE.SphereGeometry(0.017, 8, 6, 0, Math.PI * 2, 0, Math.PI / 2).translate(0, 0.07, 0), hydrantMat, m);
+  addGeo(new THREE.CylinderGeometry(0.007, 0.007, 0.05, 6).rotateZ(Math.PI / 2).translate(0, 0.045, 0), hydrantMat, m);
+  addObstacle(x, y, 0.025);
+}
+function bin(x, y) {
+  const m = mat4(wx(x), 0, wz(y));
+  addGeo(new THREE.CylinderGeometry(0.026, 0.022, 0.09, 10).translate(0, 0.045, 0), binMat, m);
+  addGeo(new THREE.CylinderGeometry(0.029, 0.029, 0.008, 10).translate(0, 0.093, 0), darkMetal, m);
+  addObstacle(x, y, 0.03);
+}
+function newsBox(x, y, ry) {
+  const m = mat4(wx(x), 0, wz(y), ry);
+  addGeo(new THREE.BoxGeometry(0.05, 0.08, 0.045).translate(0, 0.06, 0), newsMat, m);
+  for (const s of [-0.018, 0.018]) addGeo(new THREE.BoxGeometry(0.006, 0.02, 0.006).translate(s, 0.01, 0), darkMetal, m);
+  addObstacle(x, y, 0.035);
+}
+// bus stop: a glass shelter with a bench and a roof, standing against the building
+function busStop(at, len, ry) {
+  const [x, y] = at, m = mat4(wx(x), 0, wz(y), ry);
+  addGeo(new THREE.BoxGeometry(0.44, 0.01, 0.13).translate(0, 0.33, 0), darkMetal, m);           // roof
+  addGeo(new THREE.BoxGeometry(0.44, 0.28, 0.006).translate(0, 0.19, -0.06), shelterGlass, m);    // back glass
+  for (const s of [-0.22, 0.22]) {
+    addGeo(new THREE.BoxGeometry(0.006, 0.28, 0.12).translate(s, 0.19, 0), shelterGlass, m);       // side glass
+    addGeo(new THREE.BoxGeometry(0.012, 0.33, 0.012).translate(s, 0.165, 0.06), darkMetal, m);     // posts
+    addGeo(new THREE.BoxGeometry(0.012, 0.33, 0.012).translate(s, 0.165, -0.06), darkMetal, m);
+  }
+  addGeo(new THREE.BoxGeometry(0.3, 0.01, 0.05).translate(0, 0.07, -0.03), woodMat, m);         // bench
+  addGeo(new THREE.BoxGeometry(0.1, 0.2, 0.01).translate(0.27, 0.22, 0.06), newsMat, m);          // bus sign
+}
+function planter(x, y, ry) {
+  const m = mat4(wx(x), 0, wz(y), ry);
+  addGeo(new THREE.BoxGeometry(0.2, 0.05, 0.07).translate(0, 0.025, 0), concreteMat, m);
+  for (let i = 0; i < 4; i++) addGeo(new THREE.IcosahedronGeometry(0.028, 0), pick(flowerMats), mat4(wx(x), 0.06, wz(y), ry).multiply(new THREE.Matrix4().makeTranslation(-0.075 + i * 0.05, 0, 0)));
+  addObstacle(x, y, 0.06);
+}
+
 for (const R of RECTS) {
   const x0 = R.x - 0.5, x1 = R.x + R.w - 0.5, y0 = R.y - 0.5, y1 = R.y + R.h - 0.5;
   const south = (y0 + y1) / 2 > ROWS * 0.45;
-  const corners = [[x0, y0, R.iL, R.iT], [x1, y0, R.iR, R.iT], [x0, y1, R.iL, R.iB], [x1, y1, R.iR, R.iB]];
-  for (const [cx, cy, ia, ib] of corners) {
-    if (!ia || !ib || cityRand() > (south ? 0.8 : 0.35)) continue;
-    palm(cx + (cx === x0 ? ia * 0.45 : -ia * 0.45), cy + (cy === y0 ? ib * 0.45 : -ib * 0.45));
-  }
-  const sides = [[R.iT, t => [x0 + t, y0 + 0.05], Math.PI / 2, R.w], [R.iB, t => [x0 + t, y1 - 0.05], -Math.PI / 2, R.w],
-                 [R.iL, t => [x0 + 0.05, y0 + t], Math.PI, R.h], [R.iR, t => [x1 - 0.05, y0 + t], 0, R.h]];
-  for (const [ins, at, face, len] of sides) {
+  // each side: sidewalk width, point at (distance t along the side, distance d in from the road), lamp facing, length, facing into the block
+  const sides = [[R.iT, (t, d) => [x0 + t, y0 + d], Math.PI / 2, R.w, 0], [R.iB, (t, d) => [x0 + t, y1 - d], -Math.PI / 2, R.w, Math.PI],
+                 [R.iL, (t, d) => [x0 + d, y0 + t], Math.PI, R.h, Math.PI / 2], [R.iR, (t, d) => [x1 - d, y0 + t], 0, R.h, -Math.PI / 2]];
+  for (const [ins, at, face, len, inward] of sides) {
     if (!ins) continue;
-    for (let t = 0.9; t < len - 0.3; t += 1.6) { const [lx, ly] = at(t); if (!nearObstacle(lx, ly, 0.45)) lamp(lx, ly, face); }
+    // street lamps, with a palm tree or a hydrant / bin / newspaper box between them - all at the curb
+    for (let t = 0.9; t < len - 0.3; t += 1.6) {
+      const [lx, ly] = at(t, CURB);
+      if (!nearObstacle(lx, ly, 0.45)) lamp(lx, ly, face);
+      const t2 = t + 0.8;
+      if (t2 > len - 0.5) continue;
+      const [px, py] = at(t2, CURB);
+      if (nearObstacle(px, py, 0.3)) continue;
+      const r = cityRand();
+      if (r < (south ? 0.6 : 0.28)) palm(px, py);
+      else if (r < 0.72) hydrant(px, py);
+      else if (r < 0.86) bin(px, py);
+      else newsBox(px, py, inward);
+    }
+    if (ins < 0.4) continue;
+    // a bus stop on some long streets, flower planters against the buildings on others
+    let stop = -1;
+    if (len >= 4 && cityRand() < 0.35) {
+      stop = len / 2; busStop(at(stop, ins - 0.07), len, inward + Math.PI);
+      for (const o of [-0.17, 0, 0.17]) { const [ox, oy] = at(stop + o, ins - 0.06); addObstacle(ox, oy, 0.06); }
+    }
+    for (let t = 0.7; t < len - 0.5; t += 1.3) {
+      if (stop >= 0 && Math.abs(t - stop) < 0.5) continue;
+      if (cityRand() < 0.3) { const [fx, fy] = at(t, ins - 0.05); planter(fx, fy, inward); }
+    }
+  }
+}
+
+// manhole covers on the roads
+const manholeGeo = new THREE.CylinderGeometry(0.065, 0.065, 0.006, 16);
+for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++)
+  if (isRoad(x, y) && cityRand() < 0.14) addGeo(manholeGeo, darkMetal, mat4(wx(x + (cityRand() - 0.5) * 0.5), 0.004, wz(y + (cityRand() - 0.5) * 0.5)));
+
+// billboards on some rooftops (made-up adverts)
+const ADS = [["POOP COLA", "#d62828", "#fff"], ["CHAN'S NOODLES", "#f4a261", "#3a1c00"], ["LARB by TIENCHAI", "#2a9d8f", "#fff"],
+             ["TOM PEARL GYM", "#ffd23f", "#111"], ["AJ FM 101.5", "#6a4c93", "#fff"], ["SUNSET BANK", "#1d3557", "#ffd23f"]];
+const adMats = ADS.map(([text, bg, fg]) => {
+  const c = makeCanvas(512, 192), g = c.getContext("2d");
+  g.fillStyle = bg; g.fillRect(0, 0, 512, 192);
+  g.fillStyle = "rgba(255,255,255,.15)"; g.fillRect(0, 140, 512, 52);
+  g.fillStyle = fg; g.font = "bold 64px Impact, Arial Black, sans-serif"; g.textAlign = "center"; g.textBaseline = "middle";
+  g.fillText(text, 256, 82, 480);
+  const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace;
+  return new THREE.MeshStandardMaterial({ map: tex, emissive: "#ffffff", emissiveMap: tex, emissiveIntensity: 0.55, roughness: 0.6 });
+});
+{
+  const seen = new Set();
+  for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) for (const b of BUCKET[y][x]) {
+    if (seen.has(b)) continue;
+    seen.add(b);
+    const w = b.x1 - b.x0, d = b.y1 - b.y0;
+    if (b.h < 1.5 || b.h > 6 || Math.max(w, d) < 0.8 || cityRand() > 0.16) continue;
+    const along = w >= d, len = Math.min(1.2, (along ? w : d) * 0.85), m = mat4(wx((b.x0 + b.x1) / 2), b.h, wz((b.y0 + b.y1) / 2), along ? 0 : Math.PI / 2);
+    addGeo(new THREE.BoxGeometry(len, len * 0.375, 0.02).translate(0, 0.16 + len * 0.19, 0), pick(adMats), m);
+    for (const s of [-len * 0.35, len * 0.35]) addGeo(new THREE.BoxGeometry(0.02, 0.18, 0.02).translate(s, 0.09, 0.02), darkMetal, m);
+    addGeo(new THREE.BoxGeometry(len, 0.01, 0.06).translate(0, 0.16, 0.03), darkMetal, m);
   }
 }
 // parks, plaza, parking lot, beach, pond and pier
@@ -1426,7 +1530,7 @@ const sfx = {
 let S = null;
 const rand = Math.random;
 const PLAYER_R = 0.07;   // how "wide" a person is when bumping into things
-const COP_HIT = 0.2;     // a police officer this close catches you
+const COP_HIT = 0.22;    // a police officer this close catches you
 const EAT_DIST = 0.24;
 const START = CFG.start;
 
@@ -1440,7 +1544,7 @@ const angDiff = (a, b) => Math.atan2(Math.sin(a - b), Math.cos(a - b));
 const manhattan = (x1, y1, x2, y2) => Math.abs(x1 - x2) + Math.abs(y1 - y2);
 
 // Does a person at (x, y) bump into a building, tree, lamp, water or the edge of the city?
-function bumps(x, y, r = PLAYER_R) {
+function bumps(x, y, r = PLAYER_R, noProps = false) {
   if (x < -0.5 + r || y < -0.5 + r || x > COLS - 0.5 - r || y > ROWS - 0.5 - r) return true;
   const rx = Math.round(x), ry = Math.round(y);
   for (let ty = ry - 1; ty <= ry + 1; ty++) for (let tx = rx - 1; tx <= rx + 1; tx++) {
@@ -1454,7 +1558,7 @@ function bumps(x, y, r = PLAYER_R) {
       const cx = Math.max(b.x0, Math.min(x, b.x1)), cy = Math.max(b.y0, Math.min(y, b.y1));
       if ((cx - x) ** 2 + (cy - y) ** 2 < r * r) return true;
     }
-    for (const o of OBST[ty][tx]) if (Math.hypot(o.x - x, o.y - y) < r + o.r) return true;
+    if (!noProps) for (const o of OBST[ty][tx]) if (Math.hypot(o.x - x, o.y - y) < r + o.r) return true;
   }
   return false;
 }
@@ -1498,7 +1602,7 @@ function newGame() {
   S = {
     player: { x: 0, y: 0, ang: 0, speedNow: 0, moving: false, mesh: null, eatT: 99, eatW: 0, eatGold: false, cheek: 0 },
     police: [], poops: [], cars: [], eaten: 0, lives: CFG.lives, stars: 1, charIdx: 0,
-    msgUntil: 0, safeUntil: 0, dieUntil: 0, tipUntil: 0, nav: null, navT: 0,
+    msgUntil: 0, safeUntil: 0, dieUntil: 0, tipUntil: 0, nav: null, navT: 0, track: null, navCache: new Map(), plan: [],
   };
   resetPlayer();
   setPlayerModel();
@@ -1621,50 +1725,161 @@ function eatPoop(i, now) {
   updateHud();
 }
 
-// ---------- Police AI: breadth-first search, then chase you on foot ----------
-// Works out how many steps every walkable square is from you.
-function distanceMap() {
+// ---------- Police AI: it LEARNS how you move and PREDICTS where you're going ----------
+// 1) Learning: every time you go through a junction, the police note whether you went straight, left, right or back.
+//    Over time they learn your habits (and remember them in this browser between games).
+// 2) Prediction: they follow the streets from where you are, the way you're heading, taking the turns you usually take.
+// 3) Teamwork: one officer chases you directly, the others run to where they predict you'll be, to cut you off.
+const BRAIN_KEY = "poopRunPoliceBrain";
+const brain = (() => {
+  let b = null;
+  try { b = JSON.parse(localStorage.getItem(BRAIN_KEY)); } catch (e) { b = null; }
+  if (!b || !b.turns) b = { turns: { straight: 1, left: 1, right: 1, back: 0.3 }, moves: 0 };
+  return b;
+})();
+function saveBrain() { try { localStorage.setItem(BRAIN_KEY, JSON.stringify(brain)); } catch (e) { /* private mode: just don't save */ } }
+const TURN_NAMES = { straight: "STRAIGHT ON", left: "LEFT", right: "RIGHT", back: "BACK" };
+// which way did you turn? (dir = the way you were going, d = the way you went next)
+function turnKind(dir, d) {
+  if (d[0] === dir[0] && d[1] === dir[1]) return "straight";
+  if (d[0] === -dir[0] && d[1] === -dir[1]) return "back";
+  return dir[0] * d[1] - dir[1] * d[0] > 0 ? "right" : "left";
+}
+
+// Squares the police can run through: walkable, and nothing (tree, bench, fountain...) standing in the middle
+let NAVOK = null;
+function navOk(x, y) {
+  if (!NAVOK) NAVOK = Array.from({ length: ROWS }, (_, yy) => Array.from({ length: COLS }, (_, xx) => !isWall(xx, yy) && !bumps(xx, yy, 0.09)));
+  return inside(x, y) && NAVOK[y][x];
+}
+const exits = (x, y) => DIRS.filter(([dx, dy]) => navOk(x + dx, y + dy));
+
+// watch the player and learn
+function learnFromPlayer(dt) {
+  const p = S.player, [tx, ty] = playerTile();
+  const T = S.track || (S.track = { tile: [tx, ty], dir: null, vx: 0, vy: 0, lx: p.x, ly: p.y, saveT: 0 });
+  const k = Math.min(1, dt * 5);
+  T.vx += ((p.x - T.lx) / Math.max(dt, 1e-3) - T.vx) * k; T.vy += ((p.y - T.ly) / Math.max(dt, 1e-3) - T.vy) * k;
+  T.lx = p.x; T.ly = p.y;
+  if (tx !== T.tile[0] || ty !== T.tile[1]) {
+    const ex = tx - T.tile[0], ey = ty - T.tile[1];
+    const d = Math.abs(ex) >= Math.abs(ey) ? [Math.sign(ex), 0] : [0, Math.sign(ey)];
+    // only junctions teach something (in a straight street there's no choice to make)
+    if (T.dir && exits(T.tile[0], T.tile[1]).length >= 3) { brain.turns[turnKind(T.dir, d)] += 1; brain.moves++; }
+    T.dir = d; T.tile = [tx, ty];
+  }
+  T.saveT += dt;
+  if (T.saveT > 5) { T.saveT = 0; saveBrain(); }
+}
+// the way you're heading right now (from how you're actually moving)
+function playerHeading() {
+  const T = S.track;
+  if (!T) return null;
+  if (Math.hypot(T.vx, T.vy) < 0.12) return null;            // standing still
+  return Math.abs(T.vx) >= Math.abs(T.vy) ? [Math.sign(T.vx), 0] : [0, Math.sign(T.vy)];
+}
+// follow the streets the way the player usually goes; returns the squares they'll probably reach
+function predictPlayer(steps) {
+  let [x, y] = playerTile(), dir = playerHeading();
+  const path = [];
+  if (!dir) return path;
+  for (let i = 0; i < steps; i++) {
+    let opts = exits(x, y).filter(d => !(d[0] === -dir[0] && d[1] === -dir[1]));
+    if (!opts.length) opts = exits(x, y);
+    if (!opts.length) break;
+    const best = opts.reduce((a, b) => (brain.turns[turnKind(dir, b)] > brain.turns[turnKind(dir, a)] ? b : a));
+    x += best[0]; y += best[1]; dir = best;
+    path.push([x, y]);
+  }
+  return path;
+}
+// how many steps every square is from a target square (breadth-first search)
+function distanceMap(target) {
+  const [px, py] = target || playerTile();
   const dist = Array.from({ length: ROWS }, () => Array(COLS).fill(Infinity));
-  const [px, py] = playerTile();
   const queue = [[px, py]];
   dist[py][px] = 0;
   for (let qi = 0; qi < queue.length; qi++) {
     const [x, y] = queue[qi];
     for (const [dx, dy] of DIRS) {
       const nx = x + dx, ny = y + dy;
-      if (!isWall(nx, ny) && dist[ny][nx] === Infinity) { dist[ny][nx] = dist[y][x] + 1; queue.push([nx, ny]); }
+      if (navOk(nx, ny) && dist[ny][nx] === Infinity) { dist[ny][nx] = dist[y][x] + 1; queue.push([nx, ny]); }
     }
   }
   return dist;
 }
+function navFor(target, now) {
+  const key = target[0] + "," + target[1];
+  let e = S.navCache.get(key);
+  if (!e || now - e.t > 300) { e = { t: now, d: distanceMap(target) }; S.navCache.set(key, e); }
+  return e.d;
+}
+// move one officer towards (tx, ty), walking round anything in the way
+function stepCop(c, tx, ty, sp, dt) {
+  let mx = tx - c.x, my = ty - c.y; const l = Math.hypot(mx, my);
+  if (l < 0.01) { c.speedNow = 0; return; }
+  mx /= l; my /= l;
+  const step = Math.min(l, sp * dt), side = c.side || 1;
+  for (const a of [0, 0.45, -0.45, 0.9, -0.9, 1.35, -1.35, 1.8, -1.8]) {
+    const ang = a * side, ca = Math.cos(ang), sa = Math.sin(ang), dx = mx * ca - my * sa, dy = mx * sa + my * ca;
+    const nx = c.x + dx * step, ny = c.y + dy * step;
+    if (!bumps(nx, ny, 0.06, c.squeeze > 0)) {
+      c.x = nx; c.y = ny;
+      if (ang < 0) c.side = -side;                       // keep going round the same side next time
+      c.ang += angDiff(Math.atan2(dx, dy), c.ang) * Math.min(1, dt * 10);
+      c.speedNow = sp;
+      return;
+    }
+  }
+  c.speedNow = 0;
+}
+let aiInfoT = 0;
 function updateCops(now, dt) {
-  if (!S.nav || now - S.navT > 250) { S.nav = distanceMap(); S.navT = now; }
-  const sp = copSpeed(), p = S.player;
+  const sp = copSpeed(), p = S.player, T = S.track;
+  const chaseMap = navFor(playerTile(), now);
+  const plan = predictPlayer(10);
+  S.plan = plan;
   S.police.forEach((c, i) => {
-    let tx, ty;
     const dp = Math.hypot(p.x - c.x, p.y - c.y);
-    if (dp < 1.6 && clearLine(c.x, c.y, p.x, p.y)) { tx = p.x; ty = p.y; c.wp = null; }   // close and can see you: run straight at you
-    else {
-      if (!c.wp || Math.hypot(c.wp[0] - c.x, c.wp[1] - c.y) < 0.1) {
+    let tx, ty;
+    if (dp < 2.4 && clearLine(c.x, c.y, p.x, p.y)) {
+      // close and can see you: run at where you'll be in a moment (not where you are now)
+      const lead = Math.min(0.45, dp / sp * 0.6);
+      tx = p.x + (T ? T.vx : 0) * lead; ty = p.y + (T ? T.vy : 0) * lead;
+      if (bumps(tx, ty, 0.06)) { tx = p.x; ty = p.y; }
+      c.wp = null; c.role = "chase";
+    } else {
+      // officer 1 chases, the others cut you off further and further ahead on your predicted route
+      let goal = playerTile(), role = "chase";
+      if (i > 0 && plan.length) {
+        const ahead = Math.min(plan.length - 1, Math.max(1, Math.round(dp * 0.6) + (i - 1) * 2));
+        goal = plan[ahead]; role = "cut off";
+        if (Math.hypot(goal[0] - c.x, goal[1] - c.y) < 0.8) goal = playerTile();   // already there: go for the player
+      }
+      c.role = role;
+      const map = role === "chase" ? chaseMap : navFor(goal, now);
+      if (!c.wp || Math.hypot(c.wp[0] - c.x, c.wp[1] - c.y) < 0.12 || c.goalKey !== goal + "") {
+        c.goalKey = goal + "";
         const [cx, cy] = navTile(c.x, c.y);
-        if (Math.hypot(cx - c.x, cy - c.y) > 0.14) c.wp = [cx, cy];
+        if (Math.hypot(cx - c.x, cy - c.y) > 0.16 && navOk(cx, cy)) c.wp = [cx, cy];
         else {
-          const opts = DIRS.map(([dx, dy]) => [cx + dx, cy + dy]).filter(([x, y]) => !isWall(x, y));
-          if (opts.length) c.wp = i > 0 && rand() < CFG.police_randomness * 0.4 ? pick(opts, rand)
-                                 : opts.reduce((a, b) => (S.nav[b[1]][b[0]] < S.nav[a[1]][a[0]] ? b : a));
+          const opts = DIRS.map(([dx, dy]) => [cx + dx, cy + dy]).filter(([x, y]) => navOk(x, y));
+          if (opts.length) c.wp = opts.reduce((a, b) => (map[b[1]][b[0]] < map[a[1]][a[0]] ? b : a));
         }
       }
-      [tx, ty] = c.wp || [c.x, c.y];
+      [tx, ty] = c.wp || [p.x, p.y];
     }
-    let mx = tx - c.x, my = ty - c.y; const l = Math.hypot(mx, my);
-    if (l > 0.01) {
-      mx /= l; my /= l;
-      const step = Math.min(l, sp * dt), nx = c.x + mx * step, ny = c.y + my * step;
-      if (!bumps(nx, c.y, 0.06)) c.x = nx;
-      if (!bumps(c.x, ny, 0.06)) c.y = ny;
-      c.ang += angDiff(Math.atan2(mx, my), c.ang) * Math.min(1, dt * 10);
-      c.speedNow = sp;
-    } else c.speedNow = 0;
+    const bx = c.x, by = c.y;
+    c.squeeze = Math.max(0, (c.squeeze || 0) - dt);
+    stepCop(c, tx, ty, sp, dt);
+    // stuck? (pushing against something and not getting anywhere) -> squeeze past small things for a second and try another way
+    const far = Math.hypot(tx - c.x, ty - c.y) > 0.1;
+    c.stuck = far && Math.hypot(c.x - bx, c.y - by) < sp * dt * 0.25 ? (c.stuck || 0) + dt : 0;
+    if (c.stuck > 0.5) {
+      c.stuck = 0; c.side = -(c.side || 1); c.squeeze = 1;
+      const [cx, cy] = navTile(c.x, c.y), opts = DIRS.map(([dx, dy]) => [cx + dx, cy + dy]).filter(([x, y]) => navOk(x, y));
+      c.wp = opts.length ? pick(opts, rand) : [cx, cy];
+    }
   });
   // officers don't stand inside each other
   for (let i = 0; i < S.police.length; i++) for (let j = i + 1; j < S.police.length; j++) {
@@ -1672,6 +1887,16 @@ function updateCops(now, dt) {
     if (d > 0.001 && d < 0.16) { const push = (0.16 - d) / 2, ux = (a.x - b.x) / d, uy = (a.y - b.y) / d;
       if (!bumps(a.x + ux * push, a.y + uy * push, 0.06)) { a.x += ux * push; a.y += uy * push; }
       if (!bumps(b.x - ux * push, b.y - uy * push, 0.06)) { b.x -= ux * push; b.y -= uy * push; } }
+  }
+  // show what the police have learned
+  aiInfoT -= dt;
+  if (aiInfoT <= 0) {
+    aiInfoT = 0.5;
+    const t = brain.turns, total = t.straight + t.left + t.right + t.back;
+    const fav = Object.keys(t).reduce((a, b) => (t[b] > t[a] ? b : a));
+    document.getElementById("aiinfo").innerHTML = "🚓 Police AI has studied <b>" + brain.moves + "</b> of your moves<br>" +
+      "You usually go <b>" + TURN_NAMES[fav] + "</b> (" + Math.round(t[fav] / total * 100) + "%)" +
+      (S.police.some(c => c.role === "cut off") ? " · cutting you off!" : "");
   }
 }
 
@@ -1947,6 +2172,8 @@ function drawRadar(now) {
   const dot = (x, y, color, r) => { radar.fillStyle = color; radar.beginPath(); radar.arc((x - p.x) * RT, (y - p.y) * RT, r, 0, 6.29); radar.fill(); };
   S.cars.forEach(c => dot(c.px, c.py, "#d8dde3", 1.8));
   S.poops.forEach(q => dot(q.x, q.y, q.golden ? "#ffd23f" : "#8a5a2b", 2.6));
+  // where the police think you're going (small red dots)
+  S.plan.forEach(([x, y], i) => dot(x, y, "rgba(255,60,60," + (0.85 - i * 0.08) + ")", 1.6));
   S.police.forEach((c, i) => dot(c.x, c.y, Math.floor(now / 250 + i) % 2 ? "#ff2030" : "#3070ff", 3.6));
   radar.restore();
   radar.fillStyle = "white"; radar.strokeStyle = "rgba(0,0,0,.8)"; radar.lineWidth = 2;
@@ -2201,6 +2428,7 @@ function loop(now) {
   if (S) {
     if (mode === "play") {
       updatePlayer(now, dt);
+      learnFromPlayer(dt);
       updateCops(now, dt);
       updateTraffic(dt);
       checkHit(now);
@@ -2247,7 +2475,7 @@ window.gameReady = true;
 document.getElementById("lmsg").textContent = "LOADING PEOPLE";
 // for testing in the browser console: window.__poop.state()
 window.__poop = { state: () => S, mode: () => mode, joy, keys, cam, startGame, playerTile, isWall, bumps, distanceMap, PEDS, MODELS,
-                  JUNCTIONS, lightFor, clock: () => trafficClock, setClock: t => { trafficClock = t; }, startEating, CHEEKS, FACE, FACE_REAL, setPlayerModel, addPolice,
+                  JUNCTIONS, lightFor, brain, predictPlayer, clock: () => trafficClock, setClock: t => { trafficClock = t; }, startEating, CHEEKS, FACE, FACE_REAL, setPlayerModel, addPolice,
                   setCapUp: v => { CAP_UP_COP = v; } };
 // you and the police load first (the old armour model is only a backup if they can't download)
 Promise.all([loadModel("hero").then(g => g || loadModel("soldier")), loadModel("cop").then(g => g || loadModel("soldier"))]).then(() => {
