@@ -26,6 +26,15 @@ BOSS = {"name": "David", "hp": 650, "image": "boss-david.jpg",
         "music": "boss-david-theme.mp3", "laser_sound": "boss-laser.mp3"}
 
 LIVES = 3
+
+# SHOP: every poop you eat goes into your "poop bank" (it adds up over all your games).
+# Spend it in the SHOP on 10 new looks for your player.
+SKIN_PRICE = 50
+
+# Music and sounds (files in the "sounds" folder on GitHub)
+CITY_MUSIC = "city-theme.mp3"        # plays quietly while you're in the city
+CITY_MUSIC_VOLUME = 0.18             # 0 = silent, 1 = full volume
+CAUGHT_SOUND = "caught-police.mp3"   # plays when the police catch you
 POOP_ON_MAP = 24           # how many poops are in the city at once
 GOLDEN_CHANCE = 0.15       # chance a new poop is golden (worth 3!)
 
@@ -108,6 +117,10 @@ config = {
     "characters": characters,
     "boss": {**BOSS, "image": picture(BOSS["image"])},
     "lives": LIVES,
+    "skin_price": SKIN_PRICE,
+    "city_music": CITY_MUSIC,
+    "city_music_volume": CITY_MUSIC_VOLUME,
+    "caught_sound": CAUGHT_SOUND,
     "poop_on_map": POOP_ON_MAP,
     "golden_chance": GOLDEN_CHANCE,
     "poop_per_star": POOP_PER_STAR,

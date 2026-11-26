@@ -133,14 +133,24 @@
   .logo span { display: inline-block; font-size: 32px; letter-spacing: 8px; background: white; color: #111;
                padding: 0 10px; margin-top: 6px; text-shadow: none; }
   #cards { display: flex; gap: 14px; padding: 0 28px; margin-top: auto; margin-bottom: 54px; overflow-x: auto; }
-  .card { flex: 0 0 170px; height: 170px; border-radius: 4px; position: relative; cursor: pointer; overflow: hidden;
+  .card { flex: 1 1 0; min-width: 104px; max-width: 170px; height: 170px; border-radius: 4px; position: relative; cursor: pointer; overflow: hidden;
           border: 3px solid transparent; transition: transform .12s, border-color .12s; box-shadow: 0 4px 14px rgba(0,0,0,.5); }
   .card .art { position: absolute; inset: 0; display: flex; align-items: flex-start; justify-content: center; padding-top: 26px; font-size: 58px; }
   .card .lbl { position: absolute; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,.78); padding: 6px 10px;
-               font-family: var(--title); font-size: 25px; letter-spacing: 1px; }
+               font-family: var(--title); font-size: clamp(18px, 2.6vw, 25px); letter-spacing: 1px; white-space: nowrap; }
   .card .lbl small { display: block; font-family: var(--ui); font-size: 11px; letter-spacing: 0; opacity: .8; }
   .card.sel { border-color: white; transform: translateY(-6px); }
   #panel { position: absolute; left: 28px; top: 130px; width: min(460px, calc(100% - 56px)); }
+  /* shop: 3D preview of the look you're pointing at */
+  #shopPrev { position: absolute; right: 36px; top: 120px; width: 250px; display: none; text-align: center; pointer-events: none;
+              background: radial-gradient(ellipse at 50% 80%, rgba(255,210,63,.25), rgba(0,0,0,.55) 70%); border: 2px solid rgba(255,255,255,.5); border-radius: 6px; padding-bottom: 8px; }
+  #shopPrev.on { display: block; }
+  #shopPrev canvas { width: 100%; height: 300px; display: block; }
+  #shopPrev .pname { font-family: var(--title); font-size: 28px; letter-spacing: 1px; line-height: 1; }
+  #shopPrev .pnote { font-size: 13px; opacity: .85; margin-top: 3px; }
+  @media (max-width: 760px) { #shopPrev { right: 8px; top: auto; bottom: 64px; width: 130px; } #shopPrev canvas { height: 160px; } #shopPrev .pname { font-size: 18px; } }
+  .row .v.buy { color: #ffd23f; } .row .v.own { color: #9be15d; }
+  .pdesc .bank { color: #ffd23f; font-weight: 700; }
   #menu.dark #panel { top: 50%; left: 50%; transform: translate(-50%, -50%); }
   .phead { font-family: var(--title); font-size: 32px; letter-spacing: 1px; background: var(--accent); padding: 6px 12px 2px; }
   .row { display: flex; justify-content: space-between; gap: 12px; padding: 8px 12px; background: rgba(0,0,0,.72);
@@ -200,6 +210,7 @@
     <div id="menu" class="hidden">
       <div id="mtop"><div class="logo">POOP RUN<br><span>CITY</span></div></div>
       <div id="panel" class="hidden"></div>
+      <div id="shopPrev"><canvas width="250" height="300"></canvas><div class="pname"></div><div class="pnote"></div></div>
       <div id="cards"></div>
       <div id="ibar" class="shadowtxt"></div>
     </div>
@@ -1150,7 +1161,35 @@ const MODEL_INFO = {
   // SWAT officer (Quaternius, CC0) - joins the chase at 3 wanted stars
   swat: { urls: OWN("police-swat.gltf"), yaw: 0, clips: { Idle: "CharacterArmature|Idle", Walk: "CharacterArmature|Walk", Run: "CharacterArmature|Run" }, recolor: {} },
 };
+// SHOP looks (all CC0): KayKit Adventurers + Skeletons by Kay Lousberg, and the Robot from the three.js examples (by Tomás Laulhé)
+const KAYKIT = {
+  adv: ["KayKit-Game-Assets/KayKit-Character-Pack-Adventures-1.0", "672074b73ba276876a19e8816ecdc5241817ab47", "addons/kaykit_character_pack_adventures/Characters/gltf/"],
+  skel: ["KayKit-Game-Assets/KayKit-Character-Pack-Skeletons-1.0", "15b62b9bad122f72926c10fb14d622c73819fa54", "addons/kaykit_character_pack_skeletons/Characters/gltf/"],
+};
+const kayUrls = (pack, file) => { const [r, sha, dir] = KAYKIT[pack]; return ["https://cdn.jsdelivr.net/gh/" + r + "@" + sha + "/" + dir + file, "https://raw.githubusercontent.com/" + r + "/" + sha + "/" + dir + file]; };
+const KAY_CLIPS = { Idle: "Idle", Walk: "Walking_A", Run: "Running_A" };
+const GEAR = /sword|shield|axe|staff|wand|crossbow|knife|dagger|book|mug|quiver|arrow|blade|bomb|throwable/i;   // hide the weapons they hold
+const SKINS = [
+  { id: "knight", name: "Knight", icon: "🛡️", pack: "adv", file: "Knight.glb" },
+  { id: "barbarian", name: "Barbarian", icon: "🪓", pack: "adv", file: "Barbarian.glb" },
+  { id: "mage", name: "Mage", icon: "🔮", pack: "adv", file: "Mage.glb" },
+  { id: "rogue", name: "Rogue", icon: "🗡️", pack: "adv", file: "Rogue.glb" },
+  { id: "hooded", name: "Hooded Rogue", icon: "🥷", pack: "adv", file: "Rogue_Hooded.glb" },
+  { id: "skwarrior", name: "Skeleton Warrior", icon: "💀", pack: "skel", file: "Skeleton_Warrior.glb" },
+  { id: "skmage", name: "Skeleton Mage", icon: "🧙", pack: "skel", file: "Skeleton_Mage.glb" },
+  { id: "skrogue", name: "Skeleton Rogue", icon: "☠️", pack: "skel", file: "Skeleton_Rogue.glb" },
+  { id: "skminion", name: "Skeleton Minion", icon: "🦴", pack: "skel", file: "Skeleton_Minion.glb" },
+  { id: "robot", name: "Robot", icon: "🤖", robot: true },
+];
+SKINS.forEach(k => {
+  MODEL_INFO["skin_" + k.id] = k.robot
+    ? { urls: [BASE + "RobotExpressive/RobotExpressive.glb", "https://threejs.org/examples/models/gltf/RobotExpressive/RobotExpressive.glb"], yaw: 0,
+        clips: { Idle: "Idle", Walk: "Walking", Run: "Running" }, recolor: {}, head: 2.4, height: 4.4, skin: true }
+    : { urls: kayUrls(k.pack, k.file), yaw: 0, clips: KAY_CLIPS, recolor: {}, hide: GEAR, head: 2.9, skin: true };
+});
 const MODELS = {};
+const modelLoading = {};
+function ensureModel(kind) { if (MODELS[kind]) return Promise.resolve(MODELS[kind]); return modelLoading[kind] || (modelLoading[kind] = loadModel(kind)); }
 
 function loadModel(kind) {
   return new Promise(done => {
@@ -1161,7 +1200,7 @@ function loadModel(kind) {
       loader.load(urls[i++], g => {
         g.scene.updateMatrixWorld(true);
         const box = new THREE.Box3().setFromObject(g.scene), hgt = box.max.y - box.min.y;
-        g.height = hgt > 1 && hgt < 3 ? hgt : 1.8;
+        g.height = MODEL_INFO[kind].height || (hgt > 1 && hgt < 3 ? hgt : 1.8);
         MODELS[kind] = g;
         done(g);
       }, undefined, next);
@@ -1189,6 +1228,7 @@ function makeHuman(kind, color, amount = 0.5) {
       else if (!/joint/i.test(o.material.name)) o.material.color.copy(tint);
       else o.material.color.set("#2b2b30");
     });
+    if (info.hide) model.traverse(o => { if (!o.isBone && info.hide.test(o.name)) o.visible = false; });
     model.scale.setScalar(HUMAN_H / src.height);
     model.rotation.y = info.yaw;
     g.add(model);
@@ -1205,9 +1245,11 @@ function makeHuman(kind, color, amount = 0.5) {
     let head = null;
     model.traverse(o => { if (o.isBone && /head$/i.test(o.name) && !head) head = o; });
     const bone = end => { let b = null; model.traverse(o => { if (o.isBone && !b && o.name.endsWith(end)) b = o; }); return b; };
-    const arms = [["Left", "l"], ["Right", "r"]].map(([s, k]) => ({ up: bone(s + "Arm") || bone("upperarm_" + k),
-      fore: bone(s + "ForeArm") || bone("lowerarm_" + k), hand: bone(s + "Hand") || bone("hand_" + k) }));
-    g.userData = { mixer, acts, w: { Idle: 1, Walk: 0, Run: 0 }, head, arms: arms.every(a => a.up && a.fore && a.hand) ? arms : null, real: !!info.clips };
+    const arms = [["Left", "l"], ["Right", "r"]].map(([s, k]) => ({ up: bone(s + "Arm") || bone("upperarm_" + k) || bone("upperarm" + k) || bone("UpperArm" + k.toUpperCase()),     // (three.js drops the "." in "upperarm.l")
+      fore: bone(s + "ForeArm") || bone("lowerarm_" + k) || bone("lowerarm" + k) || bone("LowerArm" + k.toUpperCase()),
+      hand: bone(s + "Hand") || bone("hand_" + k) || bone("hand" + k) || bone("Palm2" + k.toUpperCase()) }));
+    g.userData = { mixer, acts, w: { Idle: 1, Walk: 0, Run: 0 }, head, arms: arms.every(a => a.up && a.fore && a.hand) ? arms : null, real: !!info.clips,
+                   headK: info.head || 1, skin: !!info.skin };
     return g;
   }
   // Backup person made of simple shapes (used only if the 3D models can't be downloaded)
@@ -1512,7 +1554,8 @@ function updateHamster(p, dt, now) {
   if (u.head) u.head.getWorldPosition(_H); else _H.set(p.mesh.position.x, up * 0.88, p.mesh.position.z);
   // nibble nibble: fast little nods while eating
   if (u.head && u.head.isBone && w > 0.01) { turnBoneWorld(u.head, _ax.set(rx, 0, rz), Math.sin(now * 0.045) * 0.13 * w + 0.12 * w); u.head.getWorldPosition(_H); }
-  _M.set(_H.x + fx * up * 0.07, _H.y + up * 0.035, _H.z + fz * up * 0.07);             // mouth
+  const hk = u.headK || 1;                                                              // cartoon heads are bigger
+  _M.set(_H.x + fx * up * 0.07 * hk, _H.y + up * 0.035 * hk, _H.z + fz * up * 0.07 * hk);             // mouth
   // both hands up to the mouth holding the poop
   if (u.arms && w > 0.01) {
     u.arms.forEach((arm, i) => {
@@ -1549,10 +1592,10 @@ function updateHamster(p, dt, now) {
   // chubby hamster cheeks
   const puff = p.cheek * (1 + Math.sin(now * 0.045) * 0.07 * w);
   CHEEKS.forEach((m, i) => {
-    const side = i === 0 ? -1 : 1, r = up * 0.024 * (0.4 + puff * 0.45);
+    const side = i === 0 ? -1 : 1, r = up * 0.024 * Math.sqrt(hk) * (0.4 + puff * 0.45);
     m.visible = show && p.cheek > 0.03;
     m.scale.set(r * 0.9, r * 0.85, r);
-    m.position.set(_H.x + fx * up * 0.035 + rx * side * up * (0.05 + puff * 0.008), _H.y + up * 0.045, _H.z + fz * up * 0.035 + rz * side * up * (0.05 + puff * 0.008));
+    m.position.set(_H.x + fx * up * 0.035 * hk + rx * side * up * (0.05 + puff * 0.008) * hk, _H.y + up * 0.045 * hk, _H.z + fz * up * 0.035 * hk + rz * side * up * (0.05 + puff * 0.008) * hk);
   });
 }
 
@@ -1620,8 +1663,25 @@ function musicPlay(offset = 0) {
 }
 function musicPause() { if (musicNode && actx) musicOffset = actx.currentTime - musicNode.t0; musicTok++; stopNode(musicNode, 0.15); musicNode = null; }
 function musicStop(fade = 0.3) { musicTok++; musicOffset = 0; stopNode(musicNode, fade); musicNode = null; }
+function playClip(f, vol) { getClip(f).then(b => { if (b) playBuf(b, vol); }); }
+// the city song: plays quietly while you're out in the city, pauses for menus, getting caught and the boss fight
+let cityNode = null, cityTok = 0, cityOffset = 0, cityRetry = 0;
+const cityWanted = () => !!(S && !S.boss && (mode === "play" || mode === "cheat") && SETTINGS.sound !== "Off" && CFG.city_music);
+function updateCityMusic(now) {
+  if (cityWanted()) {
+    if (!cityNode && now > cityRetry) {
+      cityRetry = now + 1000;
+      const tok = ++cityTok;
+      getClip(CFG.city_music).then(b => { if (b && tok === cityTok && cityWanted() && !cityNode) cityNode = playBuf(b, CFG.city_music_volume ?? 0.18, { loop: true, offset: cityOffset, fadeIn: 1.5 }); });
+    }
+  } else if (cityNode) {
+    if (actx) cityOffset = (actx.currentTime - cityNode.t0) % cityNode.src.buffer.duration;
+    cityTok++; stopNode(cityNode, 0.4); cityNode = null;
+  }
+}
 // start downloading every sound file right away, so they're ready when needed
 setTimeout(() => {
+  fetchClip(CFG.city_music); fetchClip(CFG.caught_sound);
   (CFG.characters || []).forEach(c => fetchClip(c.sound));
   if (CFG.boss) { fetchClip(CFG.boss.laser_sound); fetchClip(CFG.boss.music); }
 }, 1500);
@@ -1711,8 +1771,9 @@ const playerTile = () => navTile(S.player.x, S.player.y);
 function setPlayerModel() {
   if (S.player.mesh) scene.remove(S.player.mesh);
   const ch = CFG.characters[S.charIdx];
-  S.player.mesh = makeHuman(MODELS.hero ? "hero" : "soldier", ch.color, 0.75);
-  addFace(S.player.mesh, ch.image);          // your rank picture becomes your face
+  const look = wornKind();
+  S.player.mesh = makeHuman(look || (MODELS.hero ? "hero" : "soldier"), ch.color, 0.75);
+  if (!look) addFace(S.player.mesh, ch.image);          // your rank picture becomes your face (shop looks keep their own face)
   scene.add(S.player.mesh);
 }
 function resetPlayer() { S.player.x = START[0]; S.player.y = START[1]; S.player.ang = Math.PI; cam.yaw = Math.PI; }
@@ -1832,6 +1893,7 @@ function eatPoop(i, now) {
   scene.remove(poop.mesh);
   S.poops.splice(i, 1);
   S.eaten += poop.value;
+  addBank(poop.value);
   startEating(poop.golden);
   const oldStars = S.stars;
   S.stars = wantedStars();
@@ -2237,6 +2299,7 @@ function checkHit(now) {
   else if (S.cars.some(c => c.v > 0.9 && carBoxDist(c, p.x, p.y) < PLAYER_R)) caught("RUN OVER", "Cars can't stop instantly - look before you cross!", now);
 }
 function caught(title, sub, now) {
+  if (title === "CAUGHT") playClip(CFG.caught_sound, 0.95);
   S.lives--;
   updateHud();
   mode = "dying";
@@ -2382,6 +2445,7 @@ const cardsEl = document.getElementById("cards"), panelEl = document.getElementB
 
 const CARDS = [
   { id: "play", label: "PLAY", sub: "Eat. Run. Escape.", icon: "💩", art: "linear-gradient(160deg, #ffb36b, #c2456e 55%, #3a1f5c)" },
+  { id: "shop", label: "SHOP", sub: "New looks for 💩", icon: "🛍️", art: "linear-gradient(160deg, #ffe066, #d1861f 55%, #4a2108)" },
   { id: "characters", label: "CHARACTERS", sub: "Who you can become", icon: "🏃", art: "linear-gradient(160deg, #3fb7a4, #1d4f6e 60%, #101828)" },
   { id: "controls", label: "CONTROLS", sub: "Keyboard, mouse, touch", icon: "🎮", art: "linear-gradient(160deg, #8a8fa8, #3a3f5c 60%, #14141f)" },
   { id: "settings", label: "SETTINGS", sub: "Graphics & camera", icon: "⚙️", art: "linear-gradient(160deg, #e0b85a, #8a5a2b 60%, #2a1a10)" },
@@ -2397,6 +2461,12 @@ function panelDef(id) {
     SETTINGS[key] = o[i]; store.set("settings", SETTINGS); if (after) after();
   } });
   switch (id) {
+    case "shop": return { title: "SHOP", rows: [
+      { label: "👤 Classic <small>(your rank's face)</small>", skin: "", value: () => worn === "" ? "✓ WEARING" : "FREE · wear", cls: worn === "" ? "own" : "", act: () => wearSkin("") },
+      ...SKINS.map(k => ({ label: k.icon + " " + k.name, skin: k.id, cls: owned.includes(k.id) ? "own" : "buy",
+        value: () => worn === k.id ? "✓ WEARING" : owned.includes(k.id) ? "OWNED · wear" : SKIN_PRICE + " 💩", act: () => buySkin(k) }))],
+      desc: 'Your poop bank: <span class="bank">' + bank + " 💩</span> · every poop you eat, in every game, goes in the bank. Every look costs " + SKIN_PRICE + " 💩." +
+            (shopMsg ? "<br><b>" + shopMsg + "</b>" : "") };
     case "characters": return { title: "CHARACTERS", rows: CFG.characters.map((c, i) =>
       info((c.image ? '<span class="thumb" style="background-image:url(&quot;' + c.image + '&quot;)"></span>' : '<span style="color:' + c.color + '">■</span> ') + c.name,
            i === 0 ? "Rank 1 - you start here" : "Rank " + (i + 1) + " - eat " + c.needs + " 💩")),
@@ -2412,7 +2482,7 @@ function panelDef(id) {
       desc: "Low graphics turns off shadows and uses smaller textures (after a reload). Use it if the game is slow." };
     case "credits": return { title: "CREDITS", rows: [
       info("Game", "Our class group · KMIDS"), info("Made with", "Python, Streamlit, Three.js"),
-      info("People models", "Soldier & X Bot (three.js examples)"), info("Animations", "Mixamo"), info("Police AI", "Breadth-first search") ],
+      info("People models", "Soldier & X Bot (three.js examples)"), info("Shop looks", "KayKit by Kay Lousberg · Robot by Tomás Laulhé (CC0)"), info("Animations", "Mixamo"), info("Police AI", "Breadth-first search") ],
       desc: "A practice project for 'Build Your First AI Project'. All characters and places are made up." };
     case "pause": return { title: "PAUSED", rows: [
       { label: "Resume", act: resume }, { label: "Full screen on / off", act: () => toggleFullscreen() },
@@ -2420,7 +2490,7 @@ function panelDef(id) {
       { label: "Quit to main menu", act: showMain } ],
       desc: "Score " + S.eaten + " 💩 · " + "★".repeat(S.stars) + " · " + CFG.characters[S.charIdx].name };
     case "over": return { title: "GAME OVER", rows: [ { label: "Play again", act: startGame }, { label: "Main menu", act: showMain } ],
-      desc: "You ate " + S.eaten + " 💩 and became " + CFG.characters[S.charIdx].name + ". Best: " + best + "." };
+      desc: "You ate " + S.eaten + " 💩 and became " + CFG.characters[S.charIdx].name + ". Best: " + best + ".<br>Poop bank: " + bank + " 💩 - spend it in the SHOP." };
   }
 }
 const FS_BTN = '<button class="ibtn fsbtn">⛶ Full screen</button>';
@@ -2436,12 +2506,21 @@ function renderMenu() {
     const p = panelDef(M.panel);
     panelEl.innerHTML = '<div class="phead">' + p.title + "</div>" + p.rows.map((r, i) => {
       const v = typeof r.value === "function" ? r.value() : (r.value || "");
-      return '<div class="row' + (i === M.row && !r.info ? " sel" : "") + (r.info ? " info" : "") + '" data-i="' + i + '"><span>' + r.label + '</span><span class="v">' + v + "</span></div>";
+      return '<div class="row' + (i === M.row && !r.info ? " sel" : "") + (r.info ? " info" : "") + '" data-i="' + i + '"><span>' + r.label + '</span><span class="v ' + (r.cls || "") + '">' + v + "</span></div>";
     }).join("") + (p.desc ? '<div class="pdesc">' + p.desc + "</div>" : "");
     ibarEl.innerHTML = FS_BTN + "<span class='mouseonly'><b>⏎</b>Select</span><span class='mouseonly'><b>↑ ↓</b>Navigate</span>" +
       (p.rows.some(r => r.change) ? "<span class='mouseonly'><b>◀ ▶</b>Change</span>" : "") + (M.back !== null ? "<span class='mouseonly'><b>Esc</b>Back</span>" : "");
   }
   ibarEl.querySelectorAll(".fsbtn").forEach(b => b.addEventListener("click", e => { e.stopPropagation(); toggleFullscreen(); }));
+  // the 3D preview next to the shop list
+  const inShop = M.where === "panel" && M.panel === "shop";
+  prevEl.classList.toggle("on", inShop);
+  if (inShop) {
+    const r = panelDef("shop").rows[M.row], k = SKINS.find(k => k.id === r.skin);
+    prevWant = k ? "skin_" + k.id : (MODELS.hero ? "hero" : "soldier");
+    prevEl.querySelector(".pname").textContent = k ? k.name : "Classic";
+    prevEl.querySelector(".pnote").textContent = worn === r.skin ? "You're wearing this" : (!k || owned.includes(k.id)) ? "Press Enter to wear it" : SKIN_PRICE + " 💩 · you have " + bank;
+  } else prevWant = null;
 }
 function selectable(p) { return p.rows.map((r, i) => (r.info ? -1 : i)).filter(i => i >= 0); }
 function openPanel(id, back = "cards") {
@@ -2454,7 +2533,7 @@ function openPanel(id, back = "cards") {
   renderMenu();
 }
 function menuBack() {
-  if (M.back === "cards") { M.where = "cards"; renderMenu(); }
+  if (M.back === "cards") { M.where = "cards"; shopMsg = ""; renderMenu(); }
   else if (M.back === "pause") openPanel("pause");
   else if (M.back === "resume") resume();
 }
@@ -2475,7 +2554,7 @@ menuEl.addEventListener("pointermove", e => {
   const el = e.target.closest("[data-i]"); if (!el || e.pointerType !== "mouse") return;
   const i = +el.dataset.i;
   if (M.where === "cards" && i !== M.card) { M.card = i; renderMenu(); }
-  if (M.where === "panel" && i !== M.row && !panelDef(M.panel).rows[i].info) { M.row = i; renderMenu(); }
+  if (M.where === "panel" && i !== M.row && !panelDef(M.panel).rows[i].info) { M.row = i; shopMsg = ""; renderMenu(); }
 });
 menuEl.addEventListener("click", e => {
   const el = e.target.closest("[data-i]"); if (!el) return;
@@ -2484,6 +2563,64 @@ menuEl.addEventListener("click", e => {
   else if (!panelDef(M.panel).rows[i].info) { M.row = i; menuActivate(); }
 });
 
+// ---------- SHOP: your poop bank buys new looks ----------
+const SKIN_PRICE = CFG.skin_price ?? 50;
+let bank = store.get("bank", 0), owned = store.get("skins", []), worn = store.get("skin", ""), shopMsg = "";
+if (!SKINS.some(k => k.id === worn)) worn = "";
+function addBank(n) { bank += n; store.set("bank", bank); }
+function wornKind() { return worn && MODELS["skin_" + worn] ? "skin_" + worn : null; }
+function wearSkin(id) {
+  worn = id; store.set("skin", id);
+  const k = SKINS.find(k => k.id === id);
+  shopMsg = k ? "You're now the " + k.name + "!" : "Back to the classic look.";
+  const swap = () => { if (S && worn === id) { const ang = S.player.ang; setPlayerModel(); S.player.ang = ang; } };
+  if (k) ensureModel("skin_" + id).then(g => { if (!g) shopMsg = "Couldn't download that look - check your internet"; else swap(); renderMenu(); }); else swap();
+  renderMenu();
+}
+function buySkin(k) {
+  if (owned.includes(k.id)) return wearSkin(k.id);
+  if (bank < SKIN_PRICE) { shopMsg = "You need " + (SKIN_PRICE - bank) + " more 💩 for the " + k.name + ". Go eat!"; sfx.hurt(); renderMenu(); return; }
+  bank -= SKIN_PRICE; store.set("bank", bank);
+  owned.push(k.id); store.set("skins", owned);
+  sfx.ding();
+  wearSkin(k.id);
+  shopMsg = "Bought the " + k.name + "! You're wearing it now.";
+  renderMenu();
+}
+if (worn) ensureModel("skin_" + worn).then(g => { if (g && S && mode === "menu") setPlayerModel(); });   // get the look you wear ready
+// the spinning preview (its own little 3D view)
+const prevEl = document.getElementById("shopPrev"), prevCanvas = prevEl.querySelector("canvas");
+let prevR = null, prevScene = null, prevCam = null, prevMesh = null, prevKind = null, prevWant = null;
+function updatePreview(dt) {
+  if (!prevWant || mode !== "menu") return;
+  if (!prevR) {
+    try { prevR = new THREE.WebGLRenderer({ canvas: prevCanvas, alpha: true, antialias: true }); } catch (e) { prevWant = null; return; }
+    prevR.setPixelRatio(Math.min(2, window.devicePixelRatio || 1)); prevR.setSize(250, 300, false);
+    prevR.toneMapping = renderer.toneMapping; prevR.toneMappingExposure = renderer.toneMappingExposure;
+    prevScene = new THREE.Scene();
+    prevScene.add(new THREE.HemisphereLight("#ffffff", "#6b5a44", 2.4));
+    const d = new THREE.DirectionalLight("#ffffff", 2.2); d.position.set(1, 2, 2); prevScene.add(d);
+    prevCam = new THREE.PerspectiveCamera(28, 250 / 300, 0.01, 10);
+    prevCam.position.set(0, HUMAN_H * 0.6, HUMAN_H * 3.3); prevCam.lookAt(0, HUMAN_H * 0.52, 0);
+  }
+  if (prevKind !== prevWant) {
+    const want = prevWant;
+    if (MODELS[want]) {
+      if (prevMesh) prevScene.remove(prevMesh);
+      const ch = CFG.characters[0];
+      prevMesh = makeHuman(want, ch.color, 0.75);
+      if (!MODEL_INFO[want].skin) addFace(prevMesh, ch.image);
+      prevMesh.rotation.y = 0.5; prevScene.add(prevMesh); prevKind = want;
+    } else {
+      prevEl.querySelector(".pnote").textContent = "Loading...";
+      ensureModel(want).then(() => { if (prevWant === want) renderMenu(); });
+      prevKind = null;
+      if (prevMesh) { prevScene.remove(prevMesh); prevMesh = null; }
+    }
+  }
+  if (prevMesh) { prevMesh.rotation.y += dt * 0.7; animateHuman(prevMesh, 0, RUN_AT, dt); }
+  prevR.render(prevScene, prevCam);
+}
 function showMain() {
   renderer.domElement.style.filter = "";
   mode = "menu";
@@ -2501,6 +2638,7 @@ function startGame() {
   S.safeUntil = now + 2500;
   playVoice(CFG.characters[S.charIdx].sound);          // the first rank's voice when you start
   (CFG.characters || []).forEach(c => getClip(c.sound)); if (CFG.boss) { getClip(CFG.boss.laser_sound); getClip(CFG.boss.music); }
+  getClip(CFG.city_music); getClip(CFG.caught_sound);
   menuEl.classList.add("hidden");
   hudEl.classList.remove("hidden");
   showTip("Eat 💩 to level up (you can eat while you run). Cars stop at red lights and brake for you - but not instantly, so look before you cross. " +
@@ -3057,7 +3195,7 @@ function endBoss(won, now) {
   S.safeUntil = now + 3000;
   mode = "play";
   if (won) {
-    S.bossBeaten = true; S.eaten += 30; S.stars = wantedStars(); addPolice(); fillPoop(); updateHud();
+    S.bossBeaten = true; S.eaten += 30; addBank(30); S.stars = wantedStars(); addPolice(); fillPoop(); updateHud();
     showMsg("YOU BEAT " + BOSS.name.toUpperCase() + "!<small>The city is yours. Keep eating 💩</small>", now, 3500, "#ffd23f");
   }
 }
@@ -3384,9 +3522,11 @@ function loop(now) {
     if (mode !== "menu" && !S.boss) drawRadar(now);
     if (mode !== "menu") updateCompass(); else compassEl.classList.remove("on");
     updateSurprise();
+    updateCityMusic(now);
     if (SETTINGS.sound === "Off" && (musicNode || voiceNode)) { musicStop(0); stopVoice(0); }
   }
   renderer.render(scene, camera);
+  updatePreview(dt);
   requestAnimationFrame(loop);
 }
 
@@ -3400,7 +3540,7 @@ document.getElementById("lmsg").textContent = "LOADING PEOPLE";
 // for testing in the browser console: window.__poop.state()
 window.__poop = { state: () => S, mode: () => mode, joy, keys, cam, startGame, playerTile, isWall, bumps, distanceMap, PEDS, MODELS,
                   JUNCTIONS, lightFor, brain, predictPlayer, clock: () => trafficClock, setClock: t => { trafficClock = t; }, startEating, CHEEKS, FACE, FACE_REAL, setPlayerModel, addPolice,
-                  setCapUp: v => { CAP_UP_COP = v; }, startQuest, startBoss, BOSS, ARENA, shoot: () => shoot(performance.now()), setFiring: v => { firing = v; }, openCheat, runCheat, cheatTap: () => cheatTap(performance.now()), clipBufs, getClip, music: () => musicNode, voice: () => voiceNode };
+                  setCapUp: v => { CAP_UP_COP = v; }, startQuest, startBoss, BOSS, ARENA, shoot: () => shoot(performance.now()), setFiring: v => { firing = v; }, openCheat, runCheat, cheatTap: () => cheatTap(performance.now()), clipBufs, getClip, music: () => musicNode, voice: () => voiceNode, city: () => cityNode, SKINS, ensureModel, wearSkin, buySkin, bank: () => bank, setBank: v => { bank = v; store.set("bank", v); }, M, renderMenu, openPanel };
 // you and the police load first (the old armour model is only a backup if they can't download)
 Promise.all([loadModel("hero").then(g => g || loadModel("soldier")), loadModel("cop").then(g => g || loadModel("soldier"))]).then(() => {
   loadModel("swat"); loadModel("copf");             // these show up a bit later, so they load in the background

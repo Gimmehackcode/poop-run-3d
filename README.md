@@ -68,5 +68,14 @@ The police officers use a **path-finding AI** called breadth-first search (BFS).
 - Older phones may run slowly. Set Graphics to Low in Settings if that happens.
 - [Add anything else you found while testing.]
 
+## Shop, music and sounds
+
+- **Poop bank and SHOP:** every poop you eat (in every game) goes into your poop bank, which is saved in your browser. Open **SHOP** in the main menu to spend it on 10 new looks for your player (50 💩 each): Knight, Barbarian, Mage, Rogue, Hooded Rogue, Skeleton Warrior, Skeleton Mage, Skeleton Rogue, Skeleton Minion and Robot. A spinning 3D preview shows each one before you buy.
+- **Music:** a quiet city song plays while you're in the city (change `CITY_MUSIC_VOLUME` in `app.py`), and David's boss theme plays in the Colosseum.
+- **Sounds:** each rank has its own voice line when you rank up, David's laser has its own sound, and there's a sound when the police catch you.
+- All sound files live in the `sounds` folder.
+
+Shop look credits: KayKit Adventurers and KayKit Skeletons by Kay Lousberg (CC0), and the Robot from the three.js examples by Tomás Laulhé (CC0). They are loaded straight from their own GitHub repositories.
+
 ## Team
 [Names of group members]
