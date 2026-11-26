@@ -51,7 +51,11 @@
   @keyframes rpop { from { transform: scale(.2) rotate(-12deg); } to { transform: scale(1) rotate(0); } }
   @keyframes rfade { 0%, 85% { opacity: 1; } 100% { opacity: 0; } }
   .thumb { display: inline-block; width: 30px; height: 30px; border-radius: 3px; background: #333 center / cover no-repeat; vertical-align: middle; margin-right: 8px; }
-  #tip { position: absolute; top: 172px; left: 14px; max-width: 300px; background: rgba(0,0,0,.72);
+  #surprise { position: absolute; top: 184px; left: 14px; max-width: 220px; background: rgba(0,0,0,.6); border-left: 4px solid #ffd23f;
+              padding: 6px 10px; font-size: 13px; line-height: 1.35; border-radius: 3px; animation: sglow 2.4s ease-in-out infinite; }
+  #surprise b { color: #ffd23f; }
+  @keyframes sglow { 0%, 100% { box-shadow: 0 0 0 rgba(255,210,63,0); } 50% { box-shadow: 0 0 14px rgba(255,210,63,.55); } }
+  #tip { position: absolute; top: 232px; left: 14px; max-width: 300px; background: rgba(0,0,0,.72);
          padding: 10px 12px; font-size: 14px; line-height: 1.4; border-radius: 3px; display: none; }
   #radar { position: absolute; left: 16px; bottom: 16px; width: 150px; height: 150px; border-radius: 50%;
            border: 3px solid rgba(0,0,0,.85); box-shadow: 0 0 0 2px rgba(255,255,255,.35); background: #222; }
@@ -64,7 +68,20 @@
   #compass.on { display: block; }
   #bossui { position: absolute; top: 58px; left: 50%; transform: translateX(-50%); width: min(520px, 70%); display: none; text-align: center; pointer-events: none; }
   #hud.boss #bossui, #hud.boss #cross, #hud.boss #weapon { display: block; }
-  #hud.boss #radar, #hud.boss #aiinfo, #hud.boss #rank { display: none; }
+  #hud.boss #radar, #hud.boss #aiinfo, #hud.boss #rank, #hud.boss #surprise { display: none; }
+  #rank { pointer-events: auto; cursor: default; -webkit-tap-highlight-color: transparent; user-select: none; }
+  /* cheat code box */
+  #cheat { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; background: rgba(0,0,0,.55); pointer-events: auto; z-index: 30; }
+  #cheat.show { display: flex; }
+  #cheat .box { width: min(360px, 86%); background: rgba(10,10,14,.94); border: 2px solid #9be15d; border-radius: 6px; padding: 16px 18px; text-align: center;
+                box-shadow: 0 0 30px rgba(155,225,93,.35); }
+  #cheat .ctitle { font-family: var(--title); font-size: 32px; letter-spacing: 3px; color: #9be15d; line-height: 1; }
+  #cheat input { width: 100%; box-sizing: border-box; margin-top: 12px; padding: 10px 12px; font: 700 20px monospace; letter-spacing: 3px; text-transform: uppercase;
+                 background: #000; color: #9be15d; border: 1px solid #9be15d; border-radius: 4px; outline: none; text-align: center; }
+  #cheatMsg { margin-top: 10px; font-size: 13px; opacity: .85; min-height: 18px; }
+  #cheatMsg.bad { color: #ff6b6b; opacity: 1; }
+  #cheat .cbtns { display: flex; gap: 8px; justify-content: center; margin-top: 10px; }
+  #cheat button { font: 700 14px var(--ui); padding: 7px 16px; border-radius: 4px; border: 1px solid rgba(255,255,255,.6); background: rgba(255,255,255,.08); color: #fff; }
   #bossui .bname { font-family: var(--title); font-size: 26px; letter-spacing: 3px; line-height: 1; margin-bottom: 4px; color: #ffdede; }
   .hbar { position: relative; height: 15px; background: rgba(0,0,0,.6); border: 2px solid rgba(255,255,255,.85); border-radius: 8px; overflow: hidden; }
   .hbar i { display: block; height: 100%; width: 100%; background: linear-gradient(90deg, #b3121b, #ff4b3b); transition: width .15s; }
@@ -146,6 +163,11 @@
   <div id="stage">
     <div id="hud" class="hidden">
       <div id="tip" class="shadowtxt"></div>
+      <div id="surprise" class="shadowtxt"></div>
+      <div id="cheat"><div class="box"><div class="ctitle">CHEAT CODE</div>
+        <input id="cheatInput" maxlength="20" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="TYPE A CODE">
+        <div id="cheatMsg">Enter = OK · Esc = close</div>
+        <div class="cbtns"><button id="cheatOk">OK</button><button id="cheatClose">CLOSE</button></div></div></div>
       <div id="rank" class="shadowtxt"><div class="pic" id="rankPic"></div><div class="name" id="rankName"></div><div class="lvl" id="rankLvl"></div><div class="bar"><i id="rankBar"></i></div></div>
       <div id="rankup" class="shadowtxt"><div class="pic" id="rankupPic"></div><div class="t1">CONGRATULATIONS!</div><div class="t2" id="rankupText"></div></div>
       <div id="topbtns"><button class="ibtn fsbtn" title="Full screen (F)">⛶</button><button class="ibtn" id="pauseBtn" title="Menu (Esc)">❚❚</button></div>
@@ -1261,10 +1283,10 @@ function faceTexture(url) {
 }
 const FACE = { w: 0.04, h: 0.05, up: 0.026, fwd: 0.034 };    // size and spot of the face (in map squares) on the armour model
 const FACE_REAL = { w: 0.036, h: 0.046, up: 0.011, fwd: 0.029 };  // ...and on the realistic person
-function addFace(g, url, k = 1) {
+function addFace(g, url, k = 1, size = 1) {
   const u = g.userData;
   if (!url || !u.head || !u.head.isBone) return;
-  const F0 = MODELS.hero && g.userData.real ? FACE_REAL : FACE, F = { w: F0.w * k, h: F0.h * k, up: F0.up * k, fwd: F0.fwd * k };
+  const F0 = MODELS.hero && g.userData.real ? FACE_REAL : FACE, F = { w: F0.w * k * size, h: F0.h * k * size, up: F0.up * k + (size - 1) * F0.h * k * 0.22, fwd: F0.fwd * k * (1 + (size - 1) * 0.55) };
   const geo = new THREE.PlaneGeometry(F.w, F.h, 8, 8), P = geo.attributes.position;
   for (let i = 0; i < P.count; i++) { const x = P.getX(i); P.setZ(i, -x * x / F.w * 1.1); }   // curve it around the head
   geo.computeVertexNormals();
@@ -2420,6 +2442,11 @@ function resume() { menuEl.classList.add("hidden"); mode = (S && S.resumeMode) |
 const MOVE_KEYS = ["arrowup", "arrowdown", "arrowleft", "arrowright", "w", "a", "s", "d", "shift"];
 document.addEventListener("keydown", e => {
   const k = e.key.toLowerCase();
+  if (mode === "cheat") {
+    if (k === "escape") { e.preventDefault(); closeCheat(); }
+    else if (k === "enter") { e.preventDefault(); runCheat(cheatInput.value); }
+    return;                                   // typing goes into the cheat box
+  }
   if (k === "f" && mode !== "loading") { e.preventDefault(); toggleFullscreen(); return; }
   if (mode === "menu" || mode === "paused" || mode === "over") {
     const nav = { arrowleft: [-1, 0], a: [-1, 0], arrowright: [1, 0], d: [1, 0], arrowup: [0, -1], w: [0, -1], arrowdown: [0, 1], s: [0, 1] };
@@ -2429,6 +2456,7 @@ document.addEventListener("keydown", e => {
     return;
   }
   if (mode !== "play" && mode !== "dying" && !inBoss()) return;
+  if (k === "o" && !e.repeat && (mode === "play" || mode === "boss")) { e.preventDefault(); if (cheatTap(performance.now())) return; }
   if (k === "escape" || k === "p") { e.preventDefault(); if (mode === "play" || mode === "boss") pause(); return; }
   if ((k === "j" || k === " ") && inBoss()) { e.preventDefault(); firing = true; return; }
   if (MOVE_KEYS.includes(k)) { e.preventDefault(); keys[k] = true; }
@@ -2438,6 +2466,61 @@ document.addEventListener("keyup", e => { const k = e.key.toLowerCase(); keys[k]
 window.addEventListener("blur", () => { for (const k in keys) keys[k] = false; firing = false; });
 document.querySelectorAll("#hud .fsbtn").forEach(b => b.addEventListener("click", () => toggleFullscreen()));
 document.getElementById("pauseBtn").addEventListener("click", () => { if (mode === "play" || mode === "boss") pause(); });
+
+// ---------- cheat codes: press O three times (or tap the rank picture three times on a phone) ----------
+const cheatEl = document.getElementById("cheat"), cheatInput = document.getElementById("cheatInput"), cheatMsgEl = document.getElementById("cheatMsg");
+const CHEATS = {
+  boss(now) {
+    if (inBoss()) return "You're already fighting " + BOSS.name + "!";
+    if (S.quest) { S.quest.marks.forEach(m => scene.remove(m.mesh)); S.quest = null; }
+    S.questAt = 0;
+    startBoss(now);
+    return null;
+  },
+};
+let cheatTaps = [];
+function cheatTap(now) {
+  cheatTaps = cheatTaps.filter(t => now - t < 1200); cheatTaps.push(now);
+  if (cheatTaps.length >= 3) { cheatTaps = []; openCheat(); return true; }
+  return false;
+}
+function openCheat() {
+  if (!S || (mode !== "play" && mode !== "boss")) return;
+  S.cheatMode = mode; mode = "cheat"; firing = false;
+  for (const k in keys) keys[k] = false;
+  joy.x = joy.y = 0;
+  cheatInput.value = ""; cheatMsgEl.textContent = "Enter = OK · Esc = close"; cheatMsgEl.className = "";
+  cheatEl.classList.add("show");
+  setTimeout(() => cheatInput.focus(), 0);
+}
+function closeCheat() {
+  cheatEl.classList.remove("show"); cheatInput.blur();
+  if (mode === "cheat") mode = S.cheatMode || "play";
+}
+function runCheat(text) {
+  const code = text.trim().toLowerCase().replace(/\s+/g, ""), fn = CHEATS[code];
+  if (!fn) { cheatMsgEl.textContent = code ? "Unknown code" : "Type a code first"; cheatMsgEl.className = "bad"; cheatInput.select(); return; }
+  closeCheat();
+  const err = fn(performance.now());
+  if (err) showMsg("CHEAT<small>" + err + "</small>", performance.now(), 2000, "#9be15d");
+}
+document.getElementById("cheatOk").addEventListener("click", () => runCheat(cheatInput.value));
+document.getElementById("cheatClose").addEventListener("click", () => closeCheat());
+cheatEl.addEventListener("pointerdown", e => { e.stopPropagation(); if (e.target === cheatEl) closeCheat(); });
+document.getElementById("rank").addEventListener("pointerdown", e => { e.stopPropagation(); if (mode === "play") cheatTap(performance.now()); });
+
+// the little note on the left: there's a surprise at Tom Pearl
+const surpriseEl = document.getElementById("surprise");
+let surpriseTxt = null;
+function updateSurprise() {
+  const last = CFG.characters[CFG.characters.length - 1];
+  let t = "";
+  if (mode !== "menu" && !S.boss) {
+    if (S.quest) t = "❓ <b>Find the 3 ?</b> in the city - follow the bar at the top!";
+    else if (!S.bossBeaten) t = "🎁 Reach <b>" + last.name + "</b> for a surprise...";
+  }
+  if (t !== surpriseTxt) { surpriseTxt = t; surpriseEl.innerHTML = t; surpriseEl.style.display = t ? "block" : "none"; }
+}
 
 // ---------- phone joystick ----------
 const joyEl = document.getElementById("joy"), knob = document.getElementById("knob");
@@ -2464,10 +2547,12 @@ let lastT = performance.now();
 //  THE TOM PEARL QUEST + BOSS FIGHT
 //  Reach Tom Pearl -> three "?" appear in the city -> find them all -> fight the boss in the Colosseum
 // =========================================================
-const BOSS = Object.assign({ name: "David", hp: 260, image: null }, CFG.boss || {});
+const BOSS = Object.assign({ name: "David", hp: 450, image: null }, CFG.boss || {});
 const ARENA = { x: COLS / 2 - 0.5, y: ROWS + 60, r: 9 };     // in map squares: far out at sea, out of sight of the city
 const BOSS_SCALE = 4;                                         // David is 4 times as tall as you
-const LASER_WARN = 1.25, LASER_FIRE = 0.45, LASER_DAMAGE = 30, AK_DAMAGE = 1, RPG_DAMAGE = 60;
+const BOSS_FACE = 1.8;                                        // his face is drawn 1.8x bigger than a normal face
+const LASER_WARN = 1.05, LASER_FIRE = 0.45, LASER_DAMAGE = 34, AK_DAMAGE = 1, RPG_DAMAGE = 60;
+const STRIKE_WARN = 1.15, STRIKE_R = 0.75, STRIKE_DAMAGE = 25;   // the red circles: fill up, then a laser comes down from the sky
 const inBoss = () => mode === "boss" || mode === "bossdie" || mode === "bosswin";
 let firing = false;
 const hurtEl = document.getElementById("hurt"), flashEl = document.getElementById("whiteflash");
@@ -2725,7 +2810,7 @@ function makeBoss() {
   g.position.set(wx(ARENA.x), 0, wz(ARENA.y));
   g.rotation.order = "YXZ";
   g.updateMatrixWorld(true);
-  addFace(g, BOSS.image, BOSS_SCALE);
+  addFace(g, BOSS.image, BOSS_SCALE, BOSS_FACE);
   const mats = [];
   g.traverse(o => { if (o.isMesh && o.material && o.material.emissive) mats.push(o.material); });
   g.userData.mats = mats;
@@ -2751,11 +2836,25 @@ function makeLaser(a, B) {
   scene.add(g);
   return { a, t: 0, g, warn, beam, hit: false, fired: false };
 }
+const strikeRingMat = new THREE.MeshBasicMaterial({ color: "#ff2a2a", transparent: true, opacity: 0.9, depthWrite: false, side: THREE.DoubleSide });
+const strikeFillMat = new THREE.MeshBasicMaterial({ color: "#ff2a2a", transparent: true, opacity: 0.38, depthWrite: false, side: THREE.DoubleSide });
+const strikeBeamMat = new THREE.MeshBasicMaterial({ color: "#ff4a3a", transparent: true, opacity: 0.8, depthWrite: false });
+[strikeRingMat, strikeFillMat, strikeBeamMat].forEach(m => { m.userData.noShadow = true; m.fog = false; });
+function makeStrike(x, y, delay) {
+  const g = new THREE.Group(); g.position.set(wx(x), 0, wz(y)); g.visible = delay <= 0;
+  const ring = new THREE.Mesh(new THREE.RingGeometry(STRIKE_R * 0.9, STRIKE_R, 40).rotateX(-Math.PI / 2), strikeRingMat.clone()); ring.position.y = 0.03; g.add(ring);
+  const fill = new THREE.Mesh(new THREE.CircleGeometry(STRIKE_R * 0.9, 40).rotateX(-Math.PI / 2), strikeFillMat); fill.position.y = 0.028; fill.scale.setScalar(0.01); g.add(fill);
+  const beam = new THREE.Group(); beam.visible = false; g.add(beam);
+  const outer = new THREE.Mesh(new THREE.CylinderGeometry(STRIKE_R * 0.55, STRIKE_R * 0.55, 30, 18, 1, true), strikeBeamMat); outer.position.y = 15; beam.add(outer);
+  const core = new THREE.Mesh(new THREE.CylinderGeometry(STRIKE_R * 0.22, STRIKE_R * 0.22, 30, 10), laserCoreMat); core.position.y = 15; beam.add(core);
+  scene.add(g);
+  return { x, y, t: 0, delay, g, ring, fill, beam, fired: false };
+}
 function startBoss(now) {
   if (!arena) arena = buildArena();
   arena.G.visible = true;
   S.police.forEach(c => { c.mesh.visible = false; if (c.cap) c.cap.visible = false; });
-  const B = S.boss = { hp: BOSS.hp, max: BOSS.hp, city: { x: S.player.x, y: S.player.y }, attackT: 3.5, lasers: [], rpg: null, rpgT: 7 + rand() * 5,
+  const B = S.boss = { hp: BOSS.hp, max: BOSS.hp, city: { x: S.player.x, y: S.player.y }, attackT: 3, lasers: [], strikes: [], wave: 0, rpg: null, rpgT: 7 + rand() * 5,
                        weapon: "ak", fireT: 0, rockets: [], fx: [], hurtT: 0, ang: 0, playerHp: 100, dead: false, endAt: 0 };
   B.mesh = makeBoss();
   const hp = new THREE.Vector3(); B.mesh.updateMatrixWorld(true);
@@ -2844,6 +2943,7 @@ function bossWin(now) {
   const B = S.boss;
   B.dead = true; B.endAt = now + 4500; mode = "bosswin"; firing = false;
   B.lasers.forEach(L => scene.remove(L.g)); B.lasers = [];
+  B.strikes.forEach(Z => scene.remove(Z.g)); B.strikes = [];
   sfx.boom();
   showMsg(BOSS.name.toUpperCase() + " DEFEATED!<small>+30 💩 bonus · back to the city...</small>", now, 4300, "#ffd23f");
 }
@@ -2851,7 +2951,7 @@ function clearBoss() {
   const B = S && S.boss;
   if (!B) return;
   scene.remove(B.mesh);
-  B.lasers.forEach(L => scene.remove(L.g)); B.rockets.forEach(r => scene.remove(r.mesh)); B.fx.forEach(f => scene.remove(f.mesh));
+  B.lasers.forEach(L => scene.remove(L.g)); B.strikes.forEach(Z => scene.remove(Z.g)); B.rockets.forEach(r => scene.remove(r.mesh)); B.fx.forEach(f => scene.remove(f.mesh));
   if (B.rpg) scene.remove(B.rpg.mesh);
   if (arena) arena.G.visible = false;
   if (AK) { AK.visible = false; RPG.visible = false; }
@@ -2920,12 +3020,28 @@ function updateBoss(now, dt) {
     }
     // David turns to look at you, and every few seconds fires lasers in straight lines.
     // First a red warning stripe shows where the laser will go. Then it fires along that line - it does NOT follow you.
+    // The more you hurt him, the angrier he gets: 2 lasers at once, then 3, then 4 (one always aimed at where you are now).
+    // Below 3/4 health he also calls laser strikes from the sky: red circles that fill up, then BOOM.
     B.attackT -= dt;
     if (B.attackT <= 0) {
-      const n = frac > 0.6 ? 1 : frac > 0.3 ? 2 : 3;
-      const base = Math.atan2(p.x - bx, p.y - by);
-      for (let i = 0; i < n; i++) B.lasers.push(makeLaser(base + (i - (n - 1) / 2) * 0.6, B));
-      B.attackT = (frac > 0.6 ? 3.1 : frac > 0.3 ? 2.7 : 2.3) + rand() * 0.8;
+      B.wave++;
+      const n = frac > 0.6 ? 2 : frac > 0.3 ? 3 : 4;
+      const base = Math.atan2(p.x - bx, p.y - by), side = rand() < 0.5 ? 1 : -1;
+      const offs = [0, 0.45 * side, -0.45 * side, Math.PI].slice(0, n);
+      offs.forEach(o => B.lasers.push(makeLaser(base + o, B)));
+      if (frac < 0.75 && B.wave % 2 === 0) {
+        const k = frac < 0.4 ? 5 : 3;
+        for (let i = 0; i < k; i++) {
+          let x = p.x, y = p.y;
+          if (i > 0) for (let t = 0; t < 20; t++) {
+            const a = rand() * Math.PI * 2, r = 1.2 + rand() * 2.6;
+            x = p.x + Math.sin(a) * r; y = p.y + Math.cos(a) * r;
+            if (Math.hypot(x - bx, y - by) < R - 0.6 && Math.hypot(x - bx, y - by) > 1.2) break;
+          }
+          B.strikes.push(makeStrike(x, y, i * 0.12));
+        }
+      }
+      B.attackT = (frac > 0.6 ? 2.6 : frac > 0.3 ? 2.2 : 1.8) + rand() * 0.6;
       sfx.charge();
     }
   }
@@ -2942,6 +3058,28 @@ function updateBoss(now, dt) {
       if (!L.hit && mode === "boss" && now > S.safeUntil && along > 0.5 && side < 0.27) { L.hit = true; hurtPlayer(LASER_DAMAGE, now); }
       L.beam.scale.set(1, 1, 1);
       if (L.t > LASER_WARN + LASER_FIRE) { scene.remove(L.g); B.lasers.splice(i, 1); }
+    }
+  }
+  // sky strikes: the red circle fills up, then a laser comes straight down
+  for (let i = B.strikes.length - 1; i >= 0; i--) {
+    const Z = B.strikes[i];
+    Z.t += dt;
+    const k = (Z.t - Z.delay) / STRIKE_WARN;
+    if (k < 0) continue;
+    Z.g.visible = true;
+    if (k < 1) {
+      Z.fill.scale.setScalar(Math.max(0.01, k));
+      Z.ring.material.opacity = 0.55 + 0.4 * Math.sin(Z.t * 18);
+    } else {
+      if (!Z.fired) {
+        Z.fired = true; Z.fill.visible = false; Z.ring.visible = false; Z.beam.visible = true; sfx.strike();
+        if (mode === "boss" && now > S.safeUntil && Math.hypot(p.x - Z.x, p.y - Z.y) < STRIKE_R) hurtPlayer(STRIKE_DAMAGE, now);
+        const boom = new THREE.Mesh(new THREE.SphereGeometry(STRIKE_R * 0.5, 16, 10), new THREE.MeshBasicMaterial({ color: "#ff5a3a", transparent: true, opacity: 0.85, depthWrite: false }));
+        boom.position.set(wx(Z.x), 0.05, wz(Z.y)); boom.scale.y = 0.4; addFx(boom, 0.4, 1.4);
+      }
+      const f = k - 1;                 // the beam shrinks away
+      Z.beam.scale.set(Math.max(0.05, 1 - f * 3), 1, Math.max(0.05, 1 - f * 3));
+      if (f > 0.3) { scene.remove(Z.g); B.strikes.splice(i, 1); }
     }
   }
   // David's body: face you (or the laser he's firing), flash when hit, fall down when beaten
@@ -2990,7 +3128,7 @@ function updateBoss(now, dt) {
       updateHud(); openPanel("over");
     } else {
       // try again: David heals up, you start at the gate
-      B.hp = B.max; B.lasers.forEach(L => scene.remove(L.g)); B.lasers = []; B.attackT = 3; B.weapon = "ak";
+      B.hp = B.max; B.lasers.forEach(L => scene.remove(L.g)); B.lasers = []; B.strikes.forEach(Z => scene.remove(Z.g)); B.strikes = []; B.wave = 0; B.attackT = 3; B.weapon = "ak";
       spawnInArena(now); updateBossUi(); mode = "boss";
     }
   }
@@ -3033,6 +3171,7 @@ Object.assign(sfx, {
   rocket() { noise(0.5, 0.14, 1600, 0.8, "bandpass"); },
   ding() { tone("triangle", 880, 880, 0.15, 0.08); tone("triangle", 1320, 1320, 0.25, 0.07, 0.12); },
   hurt() { tone("square", 230, 90, 0.25, 0.09); },
+  strike() { tone("sawtooth", 1400, 120, 0.35, 0.05); noise(0.35, 0.18, 500, 0.6, "lowpass"); },
 });
 
 function loop(now) {
@@ -3053,7 +3192,7 @@ function loop(now) {
       updateTraffic(dt);                 // the city stays alive behind the menu
       if (mode === "dying" && now > S.dieUntil) afterCaught(now);
     }
-    const frozen = mode === "paused" || mode === "over";
+    const frozen = mode === "paused" || mode === "over" || mode === "cheat";
     if (!frozen) updatePeds(dt);
 
     const p = S.player, pm = p.mesh;
@@ -3080,6 +3219,7 @@ function loop(now) {
     if (now > S.tipUntil) tipEl.style.display = "none";
     if (mode !== "menu" && !S.boss) drawRadar(now);
     if (mode !== "menu") updateCompass(); else compassEl.classList.remove("on");
+    updateSurprise();
   }
   renderer.render(scene, camera);
   requestAnimationFrame(loop);
@@ -3095,7 +3235,7 @@ document.getElementById("lmsg").textContent = "LOADING PEOPLE";
 // for testing in the browser console: window.__poop.state()
 window.__poop = { state: () => S, mode: () => mode, joy, keys, cam, startGame, playerTile, isWall, bumps, distanceMap, PEDS, MODELS,
                   JUNCTIONS, lightFor, brain, predictPlayer, clock: () => trafficClock, setClock: t => { trafficClock = t; }, startEating, CHEEKS, FACE, FACE_REAL, setPlayerModel, addPolice,
-                  setCapUp: v => { CAP_UP_COP = v; }, startQuest, startBoss, BOSS, ARENA, shoot: () => shoot(performance.now()), setFiring: v => { firing = v; } };
+                  setCapUp: v => { CAP_UP_COP = v; }, startQuest, startBoss, BOSS, ARENA, shoot: () => shoot(performance.now()), setFiring: v => { firing = v; }, openCheat, runCheat, cheatTap: () => cheatTap(performance.now()) };
 // you and the police load first (the old armour model is only a backup if they can't download)
 Promise.all([loadModel("hero").then(g => g || loadModel("soldier")), loadModel("cop").then(g => g || loadModel("soldier"))]).then(() => {
   loadModel("swat"); loadModel("copf");             // these show up a bit later, so they load in the background
