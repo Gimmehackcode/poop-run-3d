@@ -9,7 +9,7 @@ It starts with a main menu (Play, Characters, Controls, Settings, Credits). Pres
 
 The box in the top-left corner shows your current rank picture and how close you are to the next rank. When you rank up, a big pop-up in the middle of the screen says "Congratulations! You've ranked up to ...". Your rank picture is also your character's face.
 
-The police are patrol officers in blue uniforms and caps. From 3 wanted stars, SWAT officers join the chase.
+You, the police and the people walking around are realistic 3D people. Your shirt changes colour with your rank. The police are male and female patrol officers in blue uniforms and caps. From 3 wanted stars, SWAT officers join the chase.
 
 Cars drive in their lanes, stop at traffic lights and brake (and honk!) if you stand in front of them - but they can't stop instantly. When you eat a poop, your character nibbles it like a hamster with puffed-up cheeks, and you can keep running while you eat.
 
@@ -46,8 +46,8 @@ The police officers use a **path-finding AI** called breadth-first search (BFS).
 
 ## Credits
 - 3D engine: [Three.js](https://threejs.org)
-- People: the "Soldier" (you) and "X Bot" (pedestrians) models from the Three.js examples, with animations from Mixamo
-- Patrol officer (`models/police-officer.glb`): made with MakeHuman from its CC0 assets, with animations from Quaternius' Universal Animation Library (CC0), as packaged in the police-command project
+- You, the people on the street and the patrol officers (`models/player.glb`, `models/people-1.glb` to `people-4.glb`, `models/police-officer.glb`, `models/police-officer-female.glb`): made with MakeHuman from its CC0 assets, with animations from Quaternius' Universal Animation Library (CC0), as packaged in the police-command project
+- Backup models (only used if the ones above can't load): "Soldier" and "X Bot" from the Three.js examples, with animations from Mixamo
 - SWAT officer (`models/police-swat.gltf`): "SWAT" by Quaternius (CC0)
 - Fonts: Bebas Neue and Oswald (Google Fonts)
 

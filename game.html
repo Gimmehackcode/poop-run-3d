@@ -970,11 +970,20 @@ const BASE = "https://cdn.jsdelivr.net/gh/mrdoob/three.js@r160/examples/models/g
 // the police models live in this game's own GitHub repo (folder "models")
 const REPO = "Gimmehackcode/poop-run-3d";
 const OWN = f => ["https://cdn.jsdelivr.net/gh/" + REPO + "@main/models/" + f, "https://raw.githubusercontent.com/" + REPO + "/main/models/" + f];
+const HUMAN_CLIPS = { Idle: "idle", Walk: "walk", Run: "sprint" };
+const PEOPLE = ["people1", "people2", "people3", "people4"];
 const MODEL_INFO = {
   soldier: { urls: [BASE + "Soldier.glb", "https://threejs.org/examples/models/gltf/Soldier.glb"], yaw: Math.PI },
   xbot: { urls: [BASE + "Xbot.glb", "https://threejs.org/examples/models/gltf/Xbot.glb"], yaw: 0 },
-  // patrol officer (MakeHuman, CC0) - we dye his clothes police blue and give him a cap
-  cop: { urls: OWN("police-officer.glb"), yaw: 0, clips: { Idle: "idle", Walk: "walk", Run: "sprint" }, recolor: { Suit: "#243866" } },
+  // realistic people (MakeHuman, CC0). "tint" = the clothes that get your colour
+  hero: { urls: OWN("player.glb"), yaw: 0, clips: HUMAN_CLIPS, recolor: {}, tint: "Top" },
+  people1: { urls: OWN("people-1.glb"), yaw: 0, clips: HUMAN_CLIPS, recolor: {} },
+  people2: { urls: OWN("people-2.glb"), yaw: 0, clips: HUMAN_CLIPS, recolor: {} },
+  people3: { urls: OWN("people-3.glb"), yaw: 0, clips: HUMAN_CLIPS, recolor: {} },
+  people4: { urls: OWN("people-4.glb"), yaw: 0, clips: HUMAN_CLIPS, recolor: {} },
+  // patrol officers - we dye their clothes police blue and give them a cap
+  cop: { urls: OWN("police-officer.glb"), yaw: 0, clips: HUMAN_CLIPS, recolor: { Suit: "#243866" } },
+  copf: { urls: OWN("police-officer-female.glb"), yaw: 0, clips: HUMAN_CLIPS, recolor: { Suit: "#243866" } },
   // SWAT officer (Quaternius, CC0) - joins the chase at 3 wanted stars
   swat: { urls: OWN("police-swat.gltf"), yaw: 0, clips: { Idle: "CharacterArmature|Idle", Walk: "CharacterArmature|Walk", Run: "CharacterArmature|Run" }, recolor: {} },
 };
@@ -1010,7 +1019,10 @@ function makeHuman(kind, color, amount = 0.5) {
       if (!o.isMesh) return;
       o.castShadow = true; o.frustumCulled = false;
       o.material = o.material.clone();
-      if (info.recolor) { const c = info.recolor[o.material.name]; if (c) o.material.color.set(c); }   // police keep their own look
+      if (info.recolor) {                    // realistic people keep their own look...
+        const c = info.recolor[o.material.name]; if (c) o.material.color.set(c);
+        if (info.tint && o.material.name === info.tint) o.material.color.copy(tint);   // ...except the clothes that show your colour
+      }
       else if (!/joint/i.test(o.material.name)) o.material.color.copy(tint);
       else o.material.color.set("#2b2b30");
     });
@@ -1030,8 +1042,9 @@ function makeHuman(kind, color, amount = 0.5) {
     let head = null;
     model.traverse(o => { if (o.isBone && /head$/i.test(o.name) && !head) head = o; });
     const bone = end => { let b = null; model.traverse(o => { if (o.isBone && !b && o.name.endsWith(end)) b = o; }); return b; };
-    const arms = ["Left", "Right"].map(s => ({ up: bone(s + "Arm"), fore: bone(s + "ForeArm"), hand: bone(s + "Hand") }));
-    g.userData = { mixer, acts, w: { Idle: 1, Walk: 0, Run: 0 }, head, arms: arms.every(a => a.up && a.fore && a.hand) ? arms : null };
+    const arms = [["Left", "l"], ["Right", "r"]].map(([s, k]) => ({ up: bone(s + "Arm") || bone("upperarm_" + k),
+      fore: bone(s + "ForeArm") || bone("lowerarm_" + k), hand: bone(s + "Hand") || bone("hand_" + k) }));
+    g.userData = { mixer, acts, w: { Idle: 1, Walk: 0, Run: 0 }, head, arms: arms.every(a => a.up && a.fore && a.hand) ? arms : null, real: !!info.clips };
     return g;
   }
   // Backup person made of simple shapes (used only if the 3D models can't be downloaded)
@@ -1089,7 +1102,7 @@ let CAP_UP_COP = 0.09;        // how far above the head bone the cap sits on the
 function placeCap(cop) {
   if (!cop.cap) return;
   const h = cop.mesh.userData.head;
-  if (h) { h.getWorldPosition(_hp); cop.cap.position.set(_hp.x, _hp.y + HUMAN_H * (cop.kind === "cop" ? CAP_UP_COP : 0.075), _hp.z); }
+  if (h) { h.getWorldPosition(_hp); cop.cap.position.set(_hp.x, _hp.y + HUMAN_H * (cop.kind === "cop" || cop.kind === "copf" ? CAP_UP_COP : 0.075), _hp.z); }
   else cop.cap.position.set(cop.mesh.position.x, HUMAN_H * 1.02, cop.mesh.position.z);
   cop.cap.rotation.y = cop.ang;
 }
@@ -1111,12 +1124,14 @@ function faceTexture(url) {
   img.src = url;
   return (faceTextures[url] = tex);
 }
-const FACE = { w: 0.04, h: 0.05, up: 0.026, fwd: 0.034 };    // size and spot of the face (in map squares)
+const FACE = { w: 0.04, h: 0.05, up: 0.026, fwd: 0.034 };    // size and spot of the face (in map squares) on the armour model
+const FACE_REAL = { w: 0.036, h: 0.046, up: 0.011, fwd: 0.029 };  // ...and on the realistic person
 function addFace(g, url) {
   const u = g.userData;
   if (!url || !u.head || !u.head.isBone) return;
-  const geo = new THREE.PlaneGeometry(FACE.w, FACE.h, 8, 8), P = geo.attributes.position;
-  for (let i = 0; i < P.count; i++) { const x = P.getX(i); P.setZ(i, -x * x / FACE.w * 1.1); }   // curve it around the head
+  const F = MODELS.hero && g.userData.real ? FACE_REAL : FACE;
+  const geo = new THREE.PlaneGeometry(F.w, F.h, 8, 8), P = geo.attributes.position;
+  for (let i = 0; i < P.count; i++) { const x = P.getX(i); P.setZ(i, -x * x / F.w * 1.1); }   // curve it around the head
   geo.computeVertexNormals();
   const tex = faceTexture(url);
   const face = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ map: tex, emissive: "#ffffff", emissiveMap: tex, emissiveIntensity: 0.5,
@@ -1125,7 +1140,7 @@ function addFace(g, url) {
   g.updateMatrixWorld(true);
   const hp = new THREE.Vector3(), hq = new THREE.Quaternion(), hs = new THREE.Vector3();
   u.head.matrixWorld.decompose(hp, hq, hs);
-  face.position.copy(u.head.worldToLocal(new THREE.Vector3(hp.x, hp.y + FACE.up, hp.z + FACE.fwd)));
+  face.position.copy(u.head.worldToLocal(new THREE.Vector3(hp.x, hp.y + F.up, hp.z + F.fwd)));
   face.quaternion.copy(hq.invert());
   face.scale.set(1 / hs.x, 1 / hs.y, 1 / hs.z);
   face.name = "rankFace";
@@ -1471,7 +1486,7 @@ const playerTile = () => navTile(S.player.x, S.player.y);
 function setPlayerModel() {
   if (S.player.mesh) scene.remove(S.player.mesh);
   const ch = CFG.characters[S.charIdx];
-  S.player.mesh = makeHuman("soldier", ch.color, 0.5);
+  S.player.mesh = makeHuman(MODELS.hero ? "hero" : "soldier", ch.color, 0.75);
   addFace(S.player.mesh, ch.image);          // your rank picture becomes your face
   scene.add(S.player.mesh);
 }
@@ -1502,7 +1517,8 @@ function addPolice() {
   while (S.police.length < wantedStars()) {
     const [x, y] = farCrossroads(14);
     // from 3 stars, every other new officer is SWAT
-    const kind = wantedStars() >= 3 && S.police.length % 2 === 1 && MODELS.swat ? "swat" : MODELS.cop ? "cop" : "soldier";
+    let kind = wantedStars() >= 3 && S.police.length % 2 === 1 && MODELS.swat ? "swat" : MODELS.cop ? "cop" : "soldier";
+    if (kind === "cop" && MODELS.copf && rand() < 0.4) kind = "copf";     // some patrol officers are women
     const cop = { x, y, ang: 0, speedNow: 0, wp: null, kind, mesh: makeHuman(kind, "#1c2a50", 0.85), cap: kind === "swat" ? null : makeCap() };
     scene.add(cop.mesh); if (cop.cap) scene.add(cop.cap);
     S.police.push(cop);
@@ -1843,7 +1859,8 @@ function spawnPedestrians() {
     const x0 = R.x - 0.5 + R.iL * o, x1 = R.x + R.w - 0.5 - R.iR * o, y0 = R.y - 0.5 + R.iT * o, y1 = R.y + R.h - 0.5 - R.iB * o;
     const path = [[x0, y0], [x1, y0], [x1, y1], [x0, y1]];
     if (rand() < 0.5) path.reverse();
-    const kind = MODELS.xbot ? "xbot" : "soldier";
+    const ready = PEOPLE.filter(k => MODELS[k]);
+    const kind = ready.length ? pick(ready, rand) : MODELS.xbot ? "xbot" : "soldier";
     const ped = { path, seg: Math.floor(rand() * 4), t: rand(), speed: 0.22 + rand() * 0.12, ang: 0,
                   mesh: makeHuman(kind, pick(PED_COLORS, rand), kind === "xbot" ? 0.85 : 0.6) };
     scene.add(ped.mesh);
@@ -2230,14 +2247,15 @@ window.gameReady = true;
 document.getElementById("lmsg").textContent = "LOADING PEOPLE";
 // for testing in the browser console: window.__poop.state()
 window.__poop = { state: () => S, mode: () => mode, joy, keys, cam, startGame, playerTile, isWall, bumps, distanceMap, PEDS, MODELS,
-                  JUNCTIONS, lightFor, clock: () => trafficClock, setClock: t => { trafficClock = t; }, startEating, CHEEKS, FACE, setPlayerModel, addPolice,
+                  JUNCTIONS, lightFor, clock: () => trafficClock, setClock: t => { trafficClock = t; }, startEating, CHEEKS, FACE, FACE_REAL, setPlayerModel, addPolice,
                   setCapUp: v => { CAP_UP_COP = v; } };
-Promise.all([loadModel("soldier"), loadModel("cop")]).then(() => {
-  loadModel("swat");                                // SWAT only shows up later, so it loads in the background
+// you and the police load first (the old armour model is only a backup if they can't download)
+Promise.all([loadModel("hero").then(g => g || loadModel("soldier")), loadModel("cop").then(g => g || loadModel("soldier"))]).then(() => {
+  loadModel("swat"); loadModel("copf");             // these show up a bit later, so they load in the background
   newGame();
   document.getElementById("loading").classList.add("hidden");
   showMain();
-  loadModel("xbot").then(spawnPedestrians);       // people on the sidewalks load in the background
+  Promise.all(PEOPLE.map(loadModel)).then(r => (r.some(Boolean) ? spawnPedestrians() : loadModel("xbot").then(spawnPedestrians)));   // people on the sidewalks load in the background
 });
 </script>
 </body>
