@@ -11,16 +11,19 @@ import streamlit.components.v1 as components
 # Ranks: you unlock the next one when you've eaten "needs" poops.
 # speed_ms = milliseconds to RUN one map square (smaller = faster). Walking is slower.
 # image = the picture shown in the rank box (put the file next to app.py)
+# sound = the voice line played when you rank up (file in the "sounds" folder on GitHub)
 CHARACTERS = [
-    {"name": "Chan",      "needs": 0,  "color": "#f4a261", "speed_ms": 600, "image": "rank-chan.jpg"},
-    {"name": "Aj",        "needs": 10, "color": "#2a9d8f", "speed_ms": 540, "image": "rank-aj.jpg"},
-    {"name": "TienChai",  "needs": 25, "color": "#e76f51", "speed_ms": 480, "image": "rank-tienchai.jpg"},
-    {"name": "Tom Pearl", "needs": 50, "color": "#ffd23f", "speed_ms": 420, "image": "rank-tompearl.jpg"},
+    {"name": "Chan",      "needs": 0,  "color": "#f4a261", "speed_ms": 600, "image": "rank-chan.jpg",     "sound": "rank-chan.mp3"},
+    {"name": "Aj",        "needs": 10, "color": "#2a9d8f", "speed_ms": 540, "image": "rank-aj.jpg",       "sound": "rank-aj.mp3"},
+    {"name": "TienChai",  "needs": 25, "color": "#e76f51", "speed_ms": 480, "image": "rank-tienchai.jpg", "sound": "rank-tienchai.mp3"},
+    {"name": "Tom Pearl", "needs": 50, "color": "#ffd23f", "speed_ms": 420, "image": "rank-tompearl.jpg", "sound": "rank-tompearl.mp3"},
 ]
 
 # The boss you fight in the Colosseum after you find the 3 question marks (they appear when you reach the last rank)
 # hp = how much damage he can take (the Family Member Gun does 1 per bullet, the RPG does 60)
-BOSS = {"name": "David", "hp": 450, "image": "boss-david.jpg"}
+# music = the boss fight theme, laser_sound = plays every time he fires his lasers (files in the "sounds" folder on GitHub)
+BOSS = {"name": "David", "hp": 650, "image": "boss-david.jpg",
+        "music": "boss-david-theme.mp3", "laser_sound": "boss-laser.mp3"}
 
 LIVES = 3
 POOP_ON_MAP = 24           # how many poops are in the city at once

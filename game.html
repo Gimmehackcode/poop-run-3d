@@ -98,6 +98,11 @@
              font-family: var(--title); font-size: 22px; border: 3px solid #fff; pointer-events: auto; touch-action: none; }
   #hud:not(.boss) #firebtn { display: none !important; }
   #hurt { position: absolute; inset: 0; pointer-events: none; box-shadow: inset 0 0 140px 50px rgba(255,0,0,.8); opacity: 0; transition: opacity .45s; }
+  #splat { position: absolute; inset: 0; pointer-events: none; opacity: 0; transition: opacity .9s;
+           background: radial-gradient(circle at 22% 30%, rgba(92,54,22,.92) 0 7%, transparent 7.5%), radial-gradient(circle at 30% 40%, rgba(110,66,28,.9) 0 4%, transparent 4.5%),
+                       radial-gradient(circle at 74% 62%, rgba(92,54,22,.92) 0 9%, transparent 9.5%), radial-gradient(circle at 64% 74%, rgba(110,66,28,.88) 0 4%, transparent 4.5%),
+                       radial-gradient(circle at 82% 22%, rgba(92,54,22,.85) 0 3.5%, transparent 4%), radial-gradient(circle at 46% 84%, rgba(92,54,22,.85) 0 3%, transparent 3.5%); }
+  #splat b { position: absolute; left: 0; right: 0; top: 18%; text-align: center; font-family: var(--title); font-size: 46px; color: #c98b47; letter-spacing: 3px; text-shadow: 0 2px 6px #000; }
   #whiteflash { position: absolute; inset: 0; background: #fff; opacity: 0; pointer-events: none; transition: opacity 1.2s; }
   .ibtn { font-size: 16px; min-width: 38px; height: 34px; border: none; border-radius: 6px; background: rgba(0,0,0,.55);
           color: white; cursor: pointer; font-family: var(--ui); }
@@ -187,6 +192,7 @@
       <button id="firebtn" class="touchonly">FIRE</button>
       <div id="hurt"></div>
       <div id="whiteflash"></div>
+      <div id="splat"><b>SPLAT! 💩</b></div>
       <div id="banner" class="shadowtxt"></div>
       <div id="joy" class="touchonly"><div id="knob"></div></div>
     </div>
@@ -1557,6 +1563,68 @@ function audio() {
   try { if (!actx) actx = new (window.AudioContext || window.webkitAudioContext)(); if (actx.state === "suspended") actx.resume(); } catch (e) { return null; }
   return actx.state === "running" ? actx : null;
 }
+// ---------- Sound files (rank voices, David's laser, the boss music) - they live in the repo's "sounds" folder ----------
+const SND = f => ["https://cdn.jsdelivr.net/gh/" + REPO + "@main/sounds/" + encodeURI(f), "https://raw.githubusercontent.com/" + REPO + "/main/sounds/" + encodeURI(f),
+                   "https://raw.githubusercontent.com/" + REPO + "/main/" + encodeURI(f)];   // also works if the file was put next to app.py
+const clipBytes = {}, clipBufs = {}, clipDecoding = {};
+function fetchClip(f) {                       // download the file once (bytes only - no sound yet)
+  if (!f || f in clipBytes) return clipBytes[f];
+  clipBytes[f] = (async () => {
+    for (const u of SND(f)) { try { const r = await fetch(u); if (r.ok) return await r.arrayBuffer(); } catch (e) {} }
+    return null;
+  })();
+  return clipBytes[f];
+}
+function getClip(f) {                         // -> Promise of a ready-to-play sound (or null if it can't load)
+  if (!f) return Promise.resolve(null);
+  if (clipBufs[f]) return Promise.resolve(clipBufs[f]);
+  if (!clipDecoding[f]) clipDecoding[f] = (async () => {
+    const bytes = await fetchClip(f), a = audio() || (SETTINGS.sound !== "Off" ? actx : null);   // decoding also works before the sound is switched on
+    if (!bytes || !a) { delete clipDecoding[f]; return null; }
+    try { return (clipBufs[f] = await a.decodeAudioData(bytes.slice(0))); } catch (e) { return null; }
+  })();
+  return clipDecoding[f];
+}
+function playBuf(buf, vol, opts = {}) {
+  const a = audio(); if (!a || !buf) return null;
+  const src = a.createBufferSource(), g = a.createGain();
+  src.buffer = buf; src.loop = !!opts.loop;
+  g.gain.setValueAtTime(opts.fadeIn ? 0 : vol, a.currentTime);
+  if (opts.fadeIn) g.gain.linearRampToValueAtTime(vol, a.currentTime + opts.fadeIn);
+  src.connect(g); g.connect(a.destination);
+  src.start(0, (opts.offset || 0) % buf.duration);
+  return { src, g, t0: a.currentTime - (opts.offset || 0) };
+}
+function stopNode(n, fade = 0) {
+  if (!n) return;
+  try {
+    if (fade && actx) { const t = actx.currentTime; n.g.gain.cancelScheduledValues(t); n.g.gain.setValueAtTime(n.g.gain.value, t); n.g.gain.linearRampToValueAtTime(0, t + fade); n.src.stop(t + fade + 0.05); }
+    else n.src.stop();
+  } catch (e) {}
+}
+// a rank's voice line (a new one cuts off the old one)
+let voiceNode = null, voiceTok = 0;
+function playVoice(f) {
+  const tok = ++voiceTok;
+  stopNode(voiceNode, 0.15); voiceNode = null;
+  getClip(f).then(b => { if (b && tok === voiceTok) voiceNode = playBuf(b, 0.95); });
+}
+function stopVoice(fade = 0.4) { voiceTok++; stopNode(voiceNode, fade); voiceNode = null; }
+// the boss music (loops, pauses with the game)
+const MUSIC_VOL = 0.42;
+let musicNode = null, musicTok = 0, musicOffset = 0;
+function musicPlay(offset = 0) {
+  const tok = ++musicTok;
+  stopNode(musicNode, 0.1); musicNode = null;
+  getClip(CFG.boss && CFG.boss.music).then(b => { if (b && tok === musicTok) musicNode = playBuf(b, MUSIC_VOL, { loop: true, offset, fadeIn: offset ? 0.4 : 1.2 }); });
+}
+function musicPause() { if (musicNode && actx) musicOffset = actx.currentTime - musicNode.t0; musicTok++; stopNode(musicNode, 0.15); musicNode = null; }
+function musicStop(fade = 0.3) { musicTok++; musicOffset = 0; stopNode(musicNode, fade); musicNode = null; }
+// start downloading every sound file right away, so they're ready when needed
+setTimeout(() => {
+  (CFG.characters || []).forEach(c => fetchClip(c.sound));
+  if (CFG.boss) { fetchClip(CFG.boss.laser_sound); fetchClip(CFG.boss.music); }
+}, 1500);
 const sfx = {
   horn(car) {
     const a = audio(); if (!a) return;
@@ -1716,6 +1784,7 @@ const picUrl = ch => (ch.image ? 'url("' + ch.image + '")' : "none");
 const rankupEl = document.getElementById("rankup");
 function showRankUp(i) {
   const ch = CFG.characters[i];
+  playVoice(ch.sound);
   document.getElementById("rankupPic").style.backgroundImage = picUrl(ch);
   document.getElementById("rankupText").textContent = "You've ranked up to " + ch.name;
   rankupEl.classList.remove("show"); void rankupEl.offsetWidth; rankupEl.classList.add("show");
@@ -2430,13 +2499,15 @@ function startGame() {
   mode = "play";
   const now = performance.now();
   S.safeUntil = now + 2500;
+  playVoice(CFG.characters[S.charIdx].sound);          // the first rank's voice when you start
+  (CFG.characters || []).forEach(c => getClip(c.sound)); if (CFG.boss) { getClip(CFG.boss.laser_sound); getClip(CFG.boss.music); }
   menuEl.classList.add("hidden");
   hudEl.classList.remove("hidden");
   showTip("Eat 💩 to level up (you can eat while you run). Cars stop at red lights and brake for you - but not instantly, so look before you cross. " +
           "The more you eat, the more police officers chase you.<br><br><b>Hold right mouse button</b> to look around · <b>Shift</b> to run · <b>F</b> full screen · <b>Esc</b> menu", now, 9000);
 }
-function pause() { S.resumeMode = mode; firing = false; openPanel("pause"); }
-function resume() { menuEl.classList.add("hidden"); mode = (S && S.resumeMode) || "play"; }
+function pause() { S.resumeMode = mode; firing = false; if (inBoss()) musicPause(); openPanel("pause"); }
+function resume() { menuEl.classList.add("hidden"); mode = (S && S.resumeMode) || "play"; if (S && S.boss && mode !== "bosswin") musicPlay(musicOffset); }
 
 // ---------- keyboard ----------
 const MOVE_KEYS = ["arrowup", "arrowdown", "arrowleft", "arrowright", "w", "a", "s", "d", "shift"];
@@ -2547,15 +2618,16 @@ let lastT = performance.now();
 //  THE TOM PEARL QUEST + BOSS FIGHT
 //  Reach Tom Pearl -> three "?" appear in the city -> find them all -> fight the boss in the Colosseum
 // =========================================================
-const BOSS = Object.assign({ name: "David", hp: 450, image: null }, CFG.boss || {});
+const BOSS = Object.assign({ name: "David", hp: 650, image: null }, CFG.boss || {});
 const ARENA = { x: COLS / 2 - 0.5, y: ROWS + 60, r: 9 };     // in map squares: far out at sea, out of sight of the city
 const BOSS_SCALE = 4;                                         // David is 4 times as tall as you
-const BOSS_FACE = 1.8;                                        // his face is drawn 1.8x bigger than a normal face
+const BOSS_FACE = 2.3;                                        // his face is drawn 2.3x bigger than a normal face, so you can see it clearly
 const LASER_WARN = 1.05, LASER_FIRE = 0.45, LASER_DAMAGE = 34, AK_DAMAGE = 1, RPG_DAMAGE = 60;
 const STRIKE_WARN = 1.15, STRIKE_R = 0.75, STRIKE_DAMAGE = 25;   // the red circles: fill up, then a laser comes down from the sky
+const THROW_WINDUP = 0.55, THROW_FLIGHT = 1.05, POOP_HIT_R = 0.42, POOP_DAMAGE = 16;   // David throws poop: wind up, then it flies in an arc
 const inBoss = () => mode === "boss" || mode === "bossdie" || mode === "bosswin";
 let firing = false;
-const hurtEl = document.getElementById("hurt"), flashEl = document.getElementById("whiteflash");
+const hurtEl = document.getElementById("hurt"), flashEl = document.getElementById("whiteflash"), splatEl = document.getElementById("splat");
 
 // ---------- the three question marks ----------
 const qTex = (() => {
@@ -2850,11 +2922,22 @@ function makeStrike(x, y, delay) {
   scene.add(g);
   return { x, y, t: 0, delay, g, ring, fill, beam, fired: false };
 }
+const poopTargetMat = new THREE.MeshBasicMaterial({ color: "#8a5524", transparent: true, opacity: 0.85, depthWrite: false, side: THREE.DoubleSide });
+const splatMat = new THREE.MeshBasicMaterial({ color: "#5c3616", transparent: true, opacity: 0.9, depthWrite: false });
+[poopTargetMat, splatMat].forEach(m => { m.userData.noShadow = true; m.fog = false; });
+function makeThrownPoop(x, y) {
+  const mesh = makePoop(false);
+  mesh.children.filter(c => c.geometry && c.geometry.type === "RingGeometry").forEach(c => mesh.remove(c));   // no glow ring in the air
+  mesh.scale.setScalar(0.65);
+  const mark = new THREE.Mesh(new THREE.RingGeometry(POOP_HIT_R * 0.78, POOP_HIT_R, 32).rotateX(-Math.PI / 2), poopTargetMat.clone());
+  mark.position.set(wx(x), 0.035, wz(y)); scene.add(mark);
+  return { x, y, t: -1, mesh, mark, from: new THREE.Vector3(), spin: (rand() - 0.5) * 14 };
+}
 function startBoss(now) {
   if (!arena) arena = buildArena();
   arena.G.visible = true;
   S.police.forEach(c => { c.mesh.visible = false; if (c.cap) c.cap.visible = false; });
-  const B = S.boss = { hp: BOSS.hp, max: BOSS.hp, city: { x: S.player.x, y: S.player.y }, attackT: 3, lasers: [], strikes: [], wave: 0, rpg: null, rpgT: 7 + rand() * 5,
+  const B = S.boss = { hp: BOSS.hp, max: BOSS.hp, city: { x: S.player.x, y: S.player.y }, attackT: 3, lasers: [], strikes: [], wave: 0, throwT: 5.5, throw: null, poops: [], rpg: null, rpgT: 7 + rand() * 5,
                        weapon: "ak", fireT: 0, rockets: [], fx: [], hurtT: 0, ang: 0, playerHp: 100, dead: false, endAt: 0 };
   B.mesh = makeBoss();
   const hp = new THREE.Vector3(); B.mesh.updateMatrixWorld(true);
@@ -2868,6 +2951,7 @@ function startBoss(now) {
   updateBossUi();
   mode = "boss";
   sfx.boom();
+  stopVoice(0.6); musicPlay(0);
   showMsg("THE COLOSSEUM<small>Defeat " + BOSS.name.toUpperCase() + "! Hold left click (or J) to shoot · walk over an RPG to grab it</small>", now, 4500, "#ffd23f");
 }
 function spawnInArena(now) {
@@ -2944,6 +3028,8 @@ function bossWin(now) {
   B.dead = true; B.endAt = now + 4500; mode = "bosswin"; firing = false;
   B.lasers.forEach(L => scene.remove(L.g)); B.lasers = [];
   B.strikes.forEach(Z => scene.remove(Z.g)); B.strikes = [];
+  B.poops.forEach(q => { scene.remove(q.mesh); scene.remove(q.mark); }); B.poops = []; B.throw = null;
+  musicStop(2.5);
   sfx.boom();
   showMsg(BOSS.name.toUpperCase() + " DEFEATED!<small>+30 💩 bonus · back to the city...</small>", now, 4300, "#ffd23f");
 }
@@ -2951,7 +3037,9 @@ function clearBoss() {
   const B = S && S.boss;
   if (!B) return;
   scene.remove(B.mesh);
-  B.lasers.forEach(L => scene.remove(L.g)); B.strikes.forEach(Z => scene.remove(Z.g)); B.rockets.forEach(r => scene.remove(r.mesh)); B.fx.forEach(f => scene.remove(f.mesh));
+  B.lasers.forEach(L => scene.remove(L.g)); B.strikes.forEach(Z => scene.remove(Z.g)); B.rockets.forEach(r => scene.remove(r.mesh));
+  B.poops.forEach(q => { scene.remove(q.mesh); scene.remove(q.mark); });
+  musicStop(0.5); B.fx.forEach(f => scene.remove(f.mesh));
   if (B.rpg) scene.remove(B.rpg.mesh);
   if (arena) arena.G.visible = false;
   if (AK) { AK.visible = false; RPG.visible = false; }
@@ -3044,6 +3132,22 @@ function updateBoss(now, dt) {
       B.attackT = (frac > 0.6 ? 2.6 : frac > 0.3 ? 2.2 : 1.8) + rand() * 0.6;
       sfx.charge();
     }
+    // Sometimes he throws poop at you! A brown ring shows where it will land - it lands where you WERE, so keep moving.
+    B.throwT -= dt;
+    if (B.throwT <= 0 && !B.throw) {
+      const k = frac > 0.6 ? 1 : frac > 0.3 ? 2 : 3, list = [];
+      for (let i = 0; i < k; i++) {
+        let x = p.x, y = p.y;
+        if (i > 0) for (let t = 0; t < 20; t++) {
+          const a = rand() * Math.PI * 2, r = 0.9 + rand() * 1.6;
+          x = p.x + Math.sin(a) * r; y = p.y + Math.cos(a) * r;
+          if (Math.hypot(x - bx, y - by) < R - 0.5 && Math.hypot(x - bx, y - by) > 1.2) break;
+        }
+        list.push(makeThrownPoop(x, y));
+      }
+      B.throw = { t: 0, list, released: false };
+      B.throwT = (frac > 0.6 ? 4.8 : frac > 0.3 ? 4 : 3.3) + rand() * 1.5;
+    }
   }
   // lasers: warning -> fire -> gone
   for (let i = B.lasers.length - 1; i >= 0; i--) {
@@ -3052,12 +3156,45 @@ function updateBoss(now, dt) {
     if (L.t < LASER_WARN) {
       L.warn.material.opacity = 0.18 + 0.4 * (L.t / LASER_WARN) * (0.6 + 0.4 * Math.sin(L.t * (10 + L.t * 25)));
     } else {
-      if (!L.fired) { L.fired = true; L.warn.visible = false; L.beam.visible = true; sfx.zap(); }
+      if (!L.fired) { L.fired = true; L.warn.visible = false; L.beam.visible = true; sfx.laser(); }
       // hit you if you're standing on the line
       const ux = Math.sin(L.a), uy = Math.cos(L.a), ex = p.x - bx, ey = p.y - by, along = ex * ux + ey * uy, side = Math.abs(-ex * uy + ey * ux);
       if (!L.hit && mode === "boss" && now > S.safeUntil && along > 0.5 && side < 0.27) { L.hit = true; hurtPlayer(LASER_DAMAGE, now); }
       L.beam.scale.set(1, 1, 1);
       if (L.t > LASER_WARN + LASER_FIRE) { scene.remove(L.g); B.lasers.splice(i, 1); }
+    }
+  }
+  // thrown poop: wind up, let go, fly in an arc, SPLAT
+  const T = B.throw;
+  if (T) {
+    T.t += dt;
+    if (!T.released && T.t >= THROW_WINDUP) {
+      T.released = true;
+      const hand = B.mesh.userData.arms ? B.mesh.userData.arms[1].hand : null, hp = new THREE.Vector3();
+      if (hand) hand.getWorldPosition(hp); else hp.set(wx(bx), HUMAN_H * BOSS_SCALE * 0.9, wz(by));
+      T.list.forEach((q, i) => { q.from.copy(hp); q.t = -i * 0.12; q.mesh.position.copy(hp); scene.add(q.mesh); B.poops.push(q); });
+      sfx.whoosh();
+    }
+    if (T.t > THROW_WINDUP + 0.6) B.throw = null;
+  }
+  for (let i = B.poops.length - 1; i >= 0; i--) {
+    const q = B.poops[i];
+    q.t += dt;
+    q.mark.material.opacity = 0.5 + 0.4 * Math.sin(now / 70);
+    if (q.t < 0) { q.mesh.visible = false; continue; }
+    q.mesh.visible = true;
+    const k = Math.min(1, q.t / THROW_FLIGHT), tx = wx(q.x), tz = wz(q.y);
+    q.mesh.position.set(q.from.x + (tx - q.from.x) * k, q.from.y * (1 - k) + Math.sin(k * Math.PI) * 0.75, q.from.z + (tz - q.from.z) * k);
+    q.mesh.rotation.x += q.spin * dt; q.mesh.rotation.z += q.spin * 0.6 * dt;
+    if (k >= 1) {
+      scene.remove(q.mesh); scene.remove(q.mark); B.poops.splice(i, 1);
+      const splat = new THREE.Mesh(new THREE.CircleGeometry(POOP_HIT_R * 0.8, 18).rotateX(-Math.PI / 2), splatMat.clone());
+      splat.position.set(tx, 0.03, tz); addFx(splat, 2.2, 0.3);
+      sfx.splat();
+      if (mode === "boss" && now > S.safeUntil && Math.hypot(p.x - q.x, p.y - q.y) < POOP_HIT_R) {
+        splatEl.style.transition = "none"; splatEl.style.opacity = 1; void splatEl.offsetWidth; splatEl.style.transition = ""; splatEl.style.opacity = 0;
+        hurtPlayer(POOP_DAMAGE, now);
+      }
     }
   }
   // sky strikes: the red circle fills up, then a laser comes straight down
@@ -3095,6 +3232,7 @@ function updateBoss(now, dt) {
     if (now > B.endAt) { endBoss(true, now); return; }
   }
   animateHuman(B.mesh, 0, RUN_AT, B.dead ? 0 : dt);
+  throwArm(B);
   // rockets fly, leave smoke, and explode
   for (let i = B.rockets.length - 1; i >= 0; i--) {
     const r = B.rockets[i], step = r.vel.clone().multiplyScalar(dt);
@@ -3129,9 +3267,27 @@ function updateBoss(now, dt) {
     } else {
       // try again: David heals up, you start at the gate
       B.hp = B.max; B.lasers.forEach(L => scene.remove(L.g)); B.lasers = []; B.strikes.forEach(Z => scene.remove(Z.g)); B.strikes = []; B.wave = 0; B.attackT = 3; B.weapon = "ak";
+      B.poops.forEach(q => { scene.remove(q.mesh); scene.remove(q.mark); }); B.poops = []; B.throw = null; B.throwT = 5;
       spawnInArena(now); updateBossUi(); mode = "boss";
     }
   }
+}
+// David's right arm: pulls back over his head, then swings forward to throw
+const _tw = new THREE.Vector3(), _tp = new THREE.Vector3(), _ts = new THREE.Vector3();
+function throwArm(B) {
+  const u = B.mesh.userData, T = B.throw;
+  if (!u.arms || !T || B.dead) return;
+  const arm = u.arms[1], t = T.t, W = THROW_WINDUP;
+  let w, fwd, up;
+  if (t < W) { w = Math.min(1, t / 0.2); fwd = -0.45; up = 0.8; }                       // wind up
+  else if (t < W + 0.25) { w = 1; const k = (t - W) / 0.25; fwd = -0.45 + 1.35 * k; up = 0.8 - 0.65 * k; }   // swing
+  else { w = Math.max(0, 1 - (t - W - 0.25) / 0.35); fwd = 0.9; up = 0.15; }             // follow through, then let go
+  if (w <= 0) return;
+  B.mesh.updateMatrixWorld(true);
+  const fx = Math.sin(B.ang), fz = Math.cos(B.ang), rx = -fz, rz = fx, L = HUMAN_H * BOSS_SCALE * 0.33;
+  arm.up.getWorldPosition(_ts);
+  _tw.set(_ts.x + (fx * fwd + rx * 0.2) * L, _ts.y + up * L, _ts.z + (fz * fwd + rz * 0.2) * L);
+  reachArm(arm, _tw, _tp.set(rx * 0.8 - fx * 0.3, -0.6, rz * 0.8 - fz * 0.3), w);
 }
 // camera: looks over your shoulder and keeps David in view
 function updateBossCamera(now, dt) {
@@ -3172,6 +3328,14 @@ Object.assign(sfx, {
   ding() { tone("triangle", 880, 880, 0.15, 0.08); tone("triangle", 1320, 1320, 0.25, 0.07, 0.12); },
   hurt() { tone("square", 230, 90, 0.25, 0.09); },
   strike() { tone("sawtooth", 1400, 120, 0.35, 0.05); noise(0.35, 0.18, 500, 0.6, "lowpass"); },
+  laser() {                     // David's laser sound (the uploaded file) - once per volley, even when several lasers fire together
+    const now = performance.now(), b = clipBufs[CFG.boss && CFG.boss.laser_sound];
+    if (now - (sfx.laserAt || 0) < 250) return;
+    sfx.laserAt = now;
+    if (b) playBuf(b, 0.75); else { sfx.zap(); getClip(CFG.boss && CFG.boss.laser_sound); }
+  },
+  whoosh() { noise(0.35, 0.12, 700, 0.8, "bandpass"); },
+  splat() { noise(0.28, 0.3, 260, 0.7, "lowpass"); tone("sine", 140, 55, 0.2, 0.08); },
 });
 
 function loop(now) {
@@ -3220,6 +3384,7 @@ function loop(now) {
     if (mode !== "menu" && !S.boss) drawRadar(now);
     if (mode !== "menu") updateCompass(); else compassEl.classList.remove("on");
     updateSurprise();
+    if (SETTINGS.sound === "Off" && (musicNode || voiceNode)) { musicStop(0); stopVoice(0); }
   }
   renderer.render(scene, camera);
   requestAnimationFrame(loop);
@@ -3235,7 +3400,7 @@ document.getElementById("lmsg").textContent = "LOADING PEOPLE";
 // for testing in the browser console: window.__poop.state()
 window.__poop = { state: () => S, mode: () => mode, joy, keys, cam, startGame, playerTile, isWall, bumps, distanceMap, PEDS, MODELS,
                   JUNCTIONS, lightFor, brain, predictPlayer, clock: () => trafficClock, setClock: t => { trafficClock = t; }, startEating, CHEEKS, FACE, FACE_REAL, setPlayerModel, addPolice,
-                  setCapUp: v => { CAP_UP_COP = v; }, startQuest, startBoss, BOSS, ARENA, shoot: () => shoot(performance.now()), setFiring: v => { firing = v; }, openCheat, runCheat, cheatTap: () => cheatTap(performance.now()) };
+                  setCapUp: v => { CAP_UP_COP = v; }, startQuest, startBoss, BOSS, ARENA, shoot: () => shoot(performance.now()), setFiring: v => { firing = v; }, openCheat, runCheat, cheatTap: () => cheatTap(performance.now()), clipBufs, getClip, music: () => musicNode, voice: () => voiceNode };
 // you and the police load first (the old armour model is only a backup if they can't download)
 Promise.all([loadModel("hero").then(g => g || loadModel("soldier")), loadModel("cop").then(g => g || loadModel("soldier"))]).then(() => {
   loadModel("swat"); loadModel("copf");             // these show up a bit later, so they load in the background
