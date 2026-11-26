@@ -18,6 +18,10 @@ CHARACTERS = [
     {"name": "Tom Pearl", "needs": 50, "color": "#ffd23f", "speed_ms": 420, "image": "rank-tompearl.jpg"},
 ]
 
+# The boss you fight in the Colosseum after you find the 3 question marks (they appear when you reach the last rank)
+# hp = how much damage he can take (the Family Member Gun does 1 per bullet, the RPG does 60)
+BOSS = {"name": "David", "hp": 260, "image": "boss-david.jpg"}
+
 LIVES = 3
 POOP_ON_MAP = 24           # how many poops are in the city at once
 GOLDEN_CHANCE = 0.15       # chance a new poop is golden (worth 3!)
@@ -99,6 +103,7 @@ characters = [{**c, "image": picture(c.get("image"))} for c in CHARACTERS]
 
 config = {
     "characters": characters,
+    "boss": {**BOSS, "image": picture(BOSS["image"])},
     "lives": LIVES,
     "poop_on_map": POOP_ON_MAP,
     "golden_chance": GOLDEN_CHANCE,

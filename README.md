@@ -11,6 +11,8 @@ The box in the top-left corner shows your current rank picture and how close you
 
 You, the police and the people walking around are realistic 3D people. Your shirt changes colour with your rank. The police are male and female patrol officers in blue uniforms and caps. From 3 wanted stars, SWAT officers join the chase.
 
+**Boss fight.** When you reach Tom Pearl, three golden question marks appear in the city, and a location bar at the top of the screen shows where they are. Find all three and you're teleported to a huge Colosseum to fight the boss, David (`boss-david.jpg` is his face - AI-generated). David stands still in the middle and fires lasers in straight lines: a red stripe on the ground warns you first, and the laser doesn't follow you, so step out of the way. Shoot him with the AK-47 "Family Member Gun" (hold left click or J; on a phone press FIRE). Now and then an RPG appears on the sand: walk over it for one big shot. Your health and David's health are shown at the top. You can change his name and health in `app.py` (`BOSS`).
+
 **The police AI learns from you.** Every time you go through a junction, it records whether you went straight, left, right or back, and remembers your habits between games (in your browser). It uses them to predict where you're heading: one officer chases you, the others run ahead along your predicted route to cut you off. The panel under your score shows what it has learned, and red dots on the minimap show where it thinks you'll go.
 
 Cars drive in their lanes, stop at traffic lights and brake (and honk!) if you stand in front of them - but they can't stop instantly. When you eat a poop, your character nibbles it like a hamster with puffed-up cheeks, and you can keep running while you eat.
@@ -44,6 +46,7 @@ The police officers use a **path-finding AI** called breadth-first search (BFS).
 - `app.py` – the Streamlit page and all the game settings (characters, wanted level, traffic, city map)
 - `game.html` – the game itself: 3D graphics (Three.js), menus, movement, camera, traffic and the police AI
 - `requirements.txt` – what Streamlit Cloud needs to install
+- `boss-david.jpg` – the boss's face (AI-generated)
 - `rank-chan.jpg`, `rank-aj.jpg`, `rank-tienchai.jpg`, `rank-tompearl.jpg` – the rank pictures (AI-generated). Swap them for your own pictures with the same names
 
 ## Credits
