@@ -78,4 +78,4 @@ The police officers use a **path-finding AI** called breadth-first search (BFS).
 Shop look credits: KayKit Adventurers and KayKit Skeletons by Kay Lousberg (CC0), and the Robot from the three.js examples by Tomás Laulhé (CC0). They are loaded straight from their own GitHub repositories.
 
 ## Team
-[Names of group members]
+Aj, TienChai
